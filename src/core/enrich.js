@@ -10,7 +10,7 @@ import { now, tx, logEvent } from './db.js'
 import { normEmail, normUrl, normLinkedin, clip } from './normalize.js'
 import { recomputeLead } from './scoring.js'
 
-const UA = 'LeadwellBot/0.1 (business website research; respects robots.txt)'
+const UA = 'FitscoutBot/0.1 (business website research; respects robots.txt)'
 const MAX_BYTES = 1_500_000
 const TIMEOUT_MS = 12_000
 const EXTRA_PATHS = ['/contact', '/contact-us', '/about', '/about-us']
@@ -81,7 +81,7 @@ export function robotsAllows(robotsTxt, path) {
     if (key.toLowerCase() === 'user-agent') {
       if (seenAgent && rules.length) seenAgent = false
       if (!seenAgent) { applies = false; seenAgent = true }
-      if (value === '*' || /leadwell/i.test(value)) applies = true
+      if (value === '*' || /fitscout/i.test(value)) applies = true
     } else {
       seenAgent = false
       if (applies && key.toLowerCase() === 'disallow' && value) rules.push(value)

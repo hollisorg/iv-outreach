@@ -1,4 +1,4 @@
-# Leadwell: agent context
+# Fitscout: agent context
 
 Working name; the product name isn't decided yet. Owner: Matthew Hollis (The Hollis Organization).
 Partner-facing first demo: Monday 2026-11-16.
@@ -13,8 +13,8 @@ mailbox, LinkedIn notes sent by the user themselves -> replies logged -> leads r
 ## Architecture
 
 - `src/core/`: plain ESM JavaScript, `node:sqlite` (no native modules). One DB file at
-  `%APPDATA%\Leadwell\leadwell.db` (override with `LEADWELL_DATA_DIR`). WAL mode; the app and the MCP server share it.
-- `src/mcp/server.js`: stdio MCP server (same pattern as IV Studio). All tools are prefixed `leadwell_`.
+  `%APPDATA%\Fitscout\fitscout.db` (override with `FITSCOUT_DATA_DIR`). WAL mode; the app and the MCP server share it.
+- `src/mcp/server.js`: stdio MCP server (same pattern as IV Studio). All tools are prefixed `fitscout_`.
 - Desktop app (Electron + electron-vite + React, mirroring IV Studio): **not built yet** (Phase B).
 - Email sending (SMTP) and reply checking (IMAP) live in the app process, so mailbox secrets stay in Electron
   `safeStorage` and never reach the MCP process: **not built yet** (Phase C).
@@ -22,8 +22,8 @@ mailbox, LinkedIn notes sent by the user themselves -> replies logged -> leads r
 ## Hard rules (agreed with Matthew 2026-11-12)
 
 - No automatic account creation, no burner or rotated identities, no measures meant to dodge spam or platform detection.
-- No LinkedIn send automation. LinkedIn is an assisted manual-send list: Leadwell drafts, the person sends.
-- Nothing sends without approval. `leadwell_approve_messages` is only for messages the person approved in chat.
+- No LinkedIn send automation. LinkedIn is an assisted manual-send list: Fitscout drafts, the person sends.
+- Nothing sends without approval. `fitscout_approve_messages` is only for messages the person approved in chat.
 - Email includes the real sender, company, postal address, a "reply stop" opt-out and a `List-Unsubscribe` header.
   Hard caps: 75 emails/day and 25 LinkedIn notes/day.
 - The do-not-contact list applies across all campaigns. Any reply stops pending follow-ups.

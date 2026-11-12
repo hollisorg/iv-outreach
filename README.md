@@ -1,4 +1,4 @@
-# Leadwell (working name)
+# Fitscout (working name)
 
 Describe your ideal customer, or paste a franchise website. Claude finds matching businesses, researches each one,
 writes a personal first message for your approval, and ranks whoever replies so you know who to call first.
@@ -26,18 +26,18 @@ npm.cmd test
 Add this to Claude Desktop's `claude_desktop_config.json` under `mcpServers` (adjust the path), then restart Claude:
 
 ```json
-"leadwell": {
+"fitscout": {
   "command": "node",
-  "args": ["C:\\Users\\Matthew\\Desktop\\leadwell\\src\\mcp\\server.js"]
+  "args": ["C:\\Users\\Matthew\\Desktop\\fitscout\\src\\mcp\\server.js"]
 }
 ```
 
-Then ask Claude: *"Use Leadwell. Build me a campaign from mrrooter.com's franchise page and find 20 owners of
+Then ask Claude: *"Use Fitscout. Build me a campaign from mrrooter.com's franchise page and find 20 owners of
 independent plumbing shops in Columbus, Ohio."*
 
 ## How a campaign runs
 
-1. **ICP**: Claude builds it from your answers or a website (`leadwell_read_website`, `leadwell_create_campaign`).
+1. **ICP**: Claude builds it from your answers or a website (`fitscout_read_website`, `fitscout_create_campaign`).
 2. **Find**: Claude researches real businesses and adds them with the page it found them on, or you import a CSV
    you already own (Sales Navigator, Apollo, Google Maps exports).
 3. **Research**: each lead's own website is read for published contact emails, socials and a summary.

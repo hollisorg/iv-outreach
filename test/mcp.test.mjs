@@ -15,7 +15,7 @@ test('MCP server lists tools and runs a campaign round trip', async () => {
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: [server],
-    env: { ...process.env, LEADWELL_DATA_DIR: dataDir },
+    env: { ...process.env, FITSCOUT_DATA_DIR: dataDir },
     stderr: 'pipe',
   })
   const client = new Client({ name: 'test', version: '0.0.0' })
@@ -23,8 +23,8 @@ test('MCP server lists tools and runs a campaign round trip', async () => {
   try {
     const { tools } = await client.listTools()
     const names = tools.map((t) => t.name)
-    for (const n of ['leadwell_overview', 'leadwell_create_campaign', 'leadwell_add_leads', 'leadwell_save_drafts',
-      'leadwell_approve_messages', 'leadwell_linkedin_queue', 'leadwell_log_reply', 'leadwell_suppress']) {
+    for (const n of ['fitscout_overview', 'fitscout_create_campaign', 'fitscout_add_leads', 'fitscout_save_drafts',
+      'fitscout_approve_messages', 'fitscout_linkedin_queue', 'fitscout_log_reply', 'fitscout_suppress']) {
       assert.ok(names.includes(n), `missing ${n}`)
     }
     const call = async (name, args = {}) => {
@@ -32,13 +32,13 @@ test('MCP server lists tools and runs a campaign round trip', async () => {
       assert.ok(!r.isError, `${name} failed: ${r.content?.[0]?.text}`)
       return JSON.parse(r.content[0].text)
     }
-    const c = await call('leadwell_create_campaign', { name: 'MCP test', offer: 'Fictional', icp: { industries: ['HVAC'] } })
-    const added = await call('leadwell_add_leads', { campaign_id: c.id, leads: [{ company: 'Fictional HVAC', email: 'info@hvac.test', source: 'claude_research' }] })
+    const c = await call('fitscout_create_campaign', { name: 'MCP test', offer: 'Fictional', icp: { industries: ['HVAC'] } })
+    const added = await call('fitscout_add_leads', { campaign_id: c.id, leads: [{ company: 'Fictional HVAC', email: 'info@hvac.test', source: 'claude_research' }] })
     assert.equal(added.added, 1)
-    const ov = await call('leadwell_overview')
+    const ov = await call('fitscout_overview')
     assert.equal(ov.campaigns[0].leads, 1)
     assert.equal(ov.sender_ready, false)
-    const bad = await client.callTool({ name: 'leadwell_get_lead', arguments: { lead_id: 'nope' } })
+    const bad = await client.callTool({ name: 'fitscout_get_lead', arguments: { lead_id: 'nope' } })
     assert.equal(JSON.parse(bad.content[0].text), null)
   } finally {
     await client.close()

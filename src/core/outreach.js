@@ -5,7 +5,7 @@
 //  * Nothing is sent without an approval.
 //  * Email goes from the user's own mailbox with their real name, company and postal
 //    address, plus a one-reply opt-out (CAN-SPAM).
-//  * LinkedIn is assisted, not automated: Leadwell drafts the note and opens the
+//  * LinkedIn is assisted, not automated: Fitscout drafts the note and opens the
 //    profile; the person sends it themselves. LinkedIn's terms forbid automated messaging.
 //  * Suppressed people are never contacted, from any campaign.
 import { now, newId, tx, logEvent, getSetting, setSetting } from './db.js'

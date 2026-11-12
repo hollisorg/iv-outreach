@@ -8,9 +8,9 @@ import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 
 export function defaultDataDir() {
-  if (process.env.LEADWELL_DATA_DIR) return process.env.LEADWELL_DATA_DIR
+  if (process.env.FITSCOUT_DATA_DIR) return process.env.FITSCOUT_DATA_DIR
   const base = process.env.APPDATA || join(homedir(), '.config')
-  return join(base, 'Leadwell')
+  return join(base, 'Fitscout')
 }
 
 const MIGRATIONS = [
@@ -119,7 +119,7 @@ const MIGRATIONS = [
 ]
 
 export function openDb(file) {
-  const path = file || join(defaultDataDir(), 'leadwell.db')
+  const path = file || join(defaultDataDir(), 'fitscout.db')
   if (path !== ':memory:') mkdirSync(join(path, '..'), { recursive: true })
   const db = new DatabaseSync(path)
   db.exec('pragma journal_mode = wal; pragma busy_timeout = 5000; pragma foreign_keys = on;')
