@@ -1,6 +1,9 @@
 # Fitscout: agent context
 
-Working name; the product name isn't decided yet. Owner: Matthew Hollis (The Hollis Organization).
+Name chosen by Matthew 2026-11-12. Renamed from the working name "Leadwell" because LeadSwell, Inc. (a San Francisco
+B2B lead-gen company with a US trademark filing) was too close. fitscout.com was unregistered when checked that day.
+A quick web and trademark search found no conflict, but there has been no legal clearance. Owner: Matthew Hollis
+(The Hollis Organization).
 Partner-facing first demo: Monday 2026-11-16.
 
 ## What it is

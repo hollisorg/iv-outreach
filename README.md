@@ -1,4 +1,4 @@
-# Fitscout (working name)
+﻿# Fitscout
 
 Describe your ideal customer, or paste a franchise website. Claude finds matching businesses, researches each one,
 writes a personal first message for your approval, and ranks whoever replies so you know who to call first.
