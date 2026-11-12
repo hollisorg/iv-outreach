@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, clipboard, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, clipboard, dialog, safeStorage, nativeImage } from 'electron'
 import { join, dirname } from 'node:path'
 import { existsSync, writeFileSync, mkdirSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
@@ -45,6 +45,74 @@ const isLinkedinProfile = (url) => {
     return u.protocol === 'https:' && /(^|\.)linkedin\.com$/i.test(u.hostname) && /^\/(in|company)\//i.test(u.pathname)
   } catch {
     return false
+  }
+}
+// Social links the app may open in the browser: profiles and DM links on the platforms Fitscout drafts for.
+const SOCIAL_HOSTS = /(^|\.)(linkedin\.com|facebook\.com|m\.me|instagram\.com|ig\.me|x\.com|twitter\.com|tiktok\.com|youtube\.com|threads\.net|pinterest\.com)$/i
+const isSocialLink = (url) => {
+  try {
+    const u = new URL(url)
+    return u.protocol === 'https:' && SOCIAL_HOSTS.test(u.hostname)
+  } catch {
+    return false
+  }
+}
+
+// --- Mailbox password: encrypted with the OS (DPAPI on Windows) through safeStorage, never written in plain text ---
+function mailPassword() {
+  const enc = readSettings().mailPassEnc
+  if (!enc || !safeStorage.isEncryptionAvailable()) return null
+  try {
+    return safeStorage.decryptString(Buffer.from(enc, 'base64'))
+  } catch {
+    return null
+  }
+}
+
+// --- The mail worker: while the app is open, sends one approved email at a time at a human pace (within the daily
+// cap), and checks the inbox for replies every few minutes ---
+let mailState = { lastSend: null, lastCheck: null, error: null, busy: false }
+let transport = null
+let transportKey = null
+async function mailTick({ force = false } = {}) {
+  if (mailState.busy) return mailState
+  const mb = fs.getMailbox(getDb())
+  const pw = mailPassword()
+  if (!fs.mailboxReady(mb) || !pw || (!mb.auto_send && !force)) return mailState
+  mailState.busy = true
+  try {
+    const key = JSON.stringify([mb.smtp_host, mb.smtp_port, mb.smtp_secure, mb.user])
+    if (!transport || key !== transportKey) {
+      transport = fs.makeTransport(mb, pw)
+      transportKey = key
+    }
+    const r = await fs.sendNext(getDb(), transport, { minGapSeconds: mb.min_gap_seconds })
+    mailState.lastSend = { at: new Date().toISOString(), ...r }
+    mailState.error = r.error || null
+    if (r.sent || r.error) send('data:changed', { tool: 'mail' })
+  } catch (e) {
+    mailState.error = e.message
+  } finally {
+    mailState.busy = false
+  }
+  return mailState
+}
+let checking = false
+async function replyTick() {
+  const mb = fs.getMailbox(getDb())
+  const pw = mailPassword()
+  if (checking || !fs.mailboxReady(mb) || !pw) return null
+  checking = true
+  try {
+    const r = await fs.checkReplies(getDb(), fs.makeImap(mb, pw))
+    mailState.lastCheck = { at: new Date().toISOString(), ...r }
+    if (r.replies || r.bounces) send('data:changed', { tool: 'replies' })
+    return r
+  } catch (e) {
+    mailState.lastCheck = { at: new Date().toISOString(), error: e.message }
+    return mailState.lastCheck
+  } finally {
+    checking = false
   }
 }
 
@@ -121,6 +189,52 @@ const METHODS = {
     return fs.markSent(getDb(), id)
   },
   logReply: (args) => fs.logReply(getDb(), args),
+
+  // socials: the send list, opening a profile or DM, finding and confirming profiles
+  socialQueue: () => fs.socialQueue(getDb()),
+  copyAndOpenSocial: ({ url, note }) => {
+    if (!isSocialLink(url)) throw new Error('Only social profile and message links can be opened from here')
+    clipboard.writeText(note || '')
+    shell.openExternal(url)
+    return { copied: true }
+  },
+  openSocial: ({ url }) => {
+    if (!isSocialLink(url)) throw new Error('Only social profile links can be opened from here')
+    shell.openExternal(url)
+    return true
+  },
+  markSocialSent: ({ id }) => {
+    const m = getDb().prepare('select channel from messages where id = ?').get(id)
+    if (!m || m.channel === 'email') throw new Error('Only social messages are marked sent by hand')
+    return fs.markSent(getDb(), id)
+  },
+  findSocials: ({ id, handles }) => fs.findSocials(getDb(), id, { handles }),
+  useSocial: ({ id, channel, url }) => fs.useSocial(getDb(), id, { channel, url }),
+  searchMaps: (args) => fs.searchGoogleMaps(getDb(), args),
+  mapsAvailable: () => !!fs.scraperPath(),
+
+  // mailbox
+  mailStatus: () => ({ ...fs.mailStatus(getDb()), hasPassword: !!mailPassword(), encryption: safeStorage.isEncryptionAvailable(), presets: fs.MAIL_PRESETS, worker: { lastSend: mailState.lastSend, lastCheck: mailState.lastCheck, error: mailState.error } }),
+  saveMailbox: (patch) => fs.saveMailbox(getDb(), patch),
+  setMailPassword: ({ password }) => {
+    if (!safeStorage.isEncryptionAvailable()) throw new Error('This PC can\'t encrypt the password, so Fitscout won\'t store it.')
+    if (!password) throw new Error('Enter the password first')
+    writeSettings({ mailPassEnc: safeStorage.encryptString(String(password)).toString('base64') })
+    transport = null
+    return true
+  },
+  clearMailPassword: () => {
+    writeSettings({ mailPassEnc: null })
+    transport = null
+    return true
+  },
+  testMailbox: async () => {
+    const pw = mailPassword()
+    if (!pw) throw new Error('Save the mailbox password first')
+    return fs.testMailbox(fs.getMailbox(getDb()), pw)
+  },
+  sendNextNow: () => mailTick({ force: true }),
+  checkRepliesNow: () => replyTick(),
   getSender: () => {
     const sender = fs.getSender(getDb())
     return { sender, missing: fs.senderGaps(sender) }
@@ -332,8 +446,12 @@ function createWindow() {
     minHeight: 660,
     title: 'Fitscout',
     backgroundColor: '#f3eee3',
+    icon: nativeImage.createFromPath(app.isPackaged ? join(process.resourcesPath, 'icon.png') : join(here, '../../build/icon.png')),
     show: false,
     autoHideMenuBar: true,
+    // IV Studio's frameless window: the app draws its own title bar, Windows draws the buttons over it
+    titleBarStyle: 'hidden',
+    ...(process.platform === 'darwin' ? { trafficLightPosition: { x: 14, y: 13 } } : { titleBarOverlay: { color: '#f3eee3', symbolColor: '#17241d', height: 40 } }),
     webPreferences: {
       preload: join(here, '../preload/index.cjs'),
       contextIsolation: true,
@@ -355,7 +473,13 @@ else {
   app.on('second-instance', () => {
     if (win) { if (win.isMinimized()) win.restore(); win.focus() }
   })
-  app.whenReady().then(createWindow)
+  app.whenReady().then(() => {
+    createWindow()
+    // the mail worker: a send attempt every 30 s (each send still waits the mailbox's minimum gap), replies every 5 min
+    setInterval(() => mailTick().catch(() => {}), 30000)
+    setInterval(() => replyTick().catch(() => {}), 5 * 60000)
+    setTimeout(() => replyTick().catch(() => {}), 15000)
+  })
   app.on('window-all-closed', () => {
     chatTurn?.stop()
     app.quit()

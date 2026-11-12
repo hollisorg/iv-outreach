@@ -13,7 +13,7 @@ export function defaultDataDir() {
   return join(base, 'Fitscout')
 }
 
-const MIGRATIONS = [
+export const MIGRATIONS = [
   `
   create table campaigns (
     id text primary key,
@@ -116,6 +116,66 @@ const MIGRATIONS = [
     data_json text not null default '{}'
   );
   `,
+  // 2: social channels (assisted send lists) and Google Business Profile details on leads
+  `
+  create table messages_v2 (
+    id text primary key,
+    lead_id text not null references leads(id) on delete cascade,
+    campaign_id text not null references campaigns(id) on delete cascade,
+    channel text not null check (channel in ('email','linkedin','facebook','instagram','x','tiktok')),
+    step integer not null default 1,
+    subject text,
+    body text not null,
+    status text not null default 'draft' check (status in
+      ('draft','approved','sent','failed','skipped','cancelled')),
+    issues_json text not null default '[]',
+    approved_at text,
+    sent_at text,
+    error text,
+    external_id text,
+    created_at text not null,
+    updated_at text not null
+  );
+  insert into messages_v2 (id, lead_id, campaign_id, channel, step, subject, body, status, issues_json, approved_at,
+    sent_at, error, external_id, created_at, updated_at)
+    select id, lead_id, campaign_id, channel, step, subject, body, status, issues_json, approved_at,
+    sent_at, error, external_id, created_at, updated_at from messages;
+  drop table messages;
+  alter table messages_v2 rename to messages;
+  create index messages_status on messages(campaign_id, status);
+  create index messages_lead on messages(lead_id);
+
+  create table replies_v2 (
+    id text primary key,
+    lead_id text not null references leads(id) on delete cascade,
+    message_id text references messages(id) on delete set null,
+    channel text not null check (channel in ('email','linkedin','facebook','instagram','x','tiktok','phone','other')),
+    received_at text not null,
+    text text,
+    sentiment text not null default 'neutral' check (sentiment in ('positive','neutral','negative')),
+    intent text not null default 'none' check (intent in ('none','question','interested','meeting','not_now','not_interested','unsubscribe')),
+    created_at text not null
+  );
+  insert into replies_v2 (id, lead_id, message_id, channel, received_at, text, sentiment, intent, created_at)
+    select id, lead_id, message_id, channel, received_at, text, sentiment, intent, created_at from replies;
+  drop table replies;
+  alter table replies_v2 rename to replies;
+  create index replies_lead on replies(lead_id);
+
+  alter table leads add column category text;
+  alter table leads add column rating real;
+  alter table leads add column review_count integer;
+  alter table leads add column address text;
+  alter table leads add column socials_scanned_at text;
+  `,
+  // 3: which mailbox messages the reply checker has already looked at
+  `
+  create table mail_seen (
+    mailbox text not null,
+    uid integer not null,
+    primary key (mailbox, uid)
+  );
+  `,
 ]
 
 export function openDb(file) {
@@ -127,12 +187,17 @@ export function openDb(file) {
   const row = db.prepare('select version from schema_version').get()
   let version = row ? row.version : 0
   if (!row) db.prepare('insert into schema_version (version) values (0)').run()
-  while (version < MIGRATIONS.length) {
-    tx(db, () => {
-      db.exec(MIGRATIONS[version])
-      version += 1
-      db.prepare('update schema_version set version = ?').run(version)
-    })
+  if (version < MIGRATIONS.length) {
+    // table rebuilds need foreign keys off (it can't change inside a transaction)
+    db.exec('pragma foreign_keys = off')
+    while (version < MIGRATIONS.length) {
+      tx(db, () => {
+        db.exec(MIGRATIONS[version])
+        version += 1
+        db.prepare('update schema_version set version = ?').run(version)
+      })
+    }
+    db.exec('pragma foreign_keys = on')
   }
   return db
 }

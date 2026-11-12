@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="1024" height="1024">
+  <!-- Fitscout app icon: the scout pin (a target for "fit") with its dashed trail, on a pine tile -->
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="#183126"/>
+  <path d="M120 404c22-26 46-40 74-46m38-5c26-1 46-6 62-20" fill="none" stroke="#f3eee3" stroke-width="18" stroke-linecap="round" stroke-dasharray="1 40" opacity=".55"/>
+  <path d="M296 96c-62 0-112 50-112 112 0 78 112 186 112 186s112-108 112-186c0-62-50-112-112-112z" fill="#f3eee3"/>
+  <circle cx="296" cy="208" r="66" fill="#183126"/>
+  <circle cx="296" cy="208" r="44" fill="#f3eee3"/>
+  <circle cx="296" cy="208" r="25" fill="#d4551f"/>
+</svg>

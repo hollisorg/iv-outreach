@@ -20,6 +20,7 @@ export default function Settings({ notify }) {
       </header>
       <Agent notify={notify} />
       <Sender notify={notify} />
+      <Mailbox notify={notify} />
       <Connect notify={notify} />
       <DoNotContact notify={notify} />
     </div>
@@ -119,6 +120,10 @@ function Sender({ notify }) {
           <input type="number" min="0" max="25" value={form.daily_linkedin_cap} onChange={(e) => setForm({ ...form, daily_linkedin_cap: e.target.value })} />
         </label>
         <label>
+          <span>Facebook / Instagram / X / TikTok notes per day, each (max 25)</span>
+          <input type="number" min="0" max="25" value={form.daily_social_cap} onChange={(e) => setForm({ ...form, daily_social_cap: e.target.value })} />
+        </label>
+        <label>
           <span>Days before a follow-up</span>
           <input type="number" min="2" max="14" value={form.followup_days} onChange={(e) => setForm({ ...form, followup_days: e.target.value })} />
         </label>
@@ -127,6 +132,96 @@ function Sender({ notify }) {
         <button className="btn btn-primary" onClick={save}>Save sender profile</button>
         {data?.missing?.length > 0 && <span className="small bad">Missing: {data.missing.join(', ')}</span>}
       </div>
+    </section>
+  )
+}
+
+function Mailbox({ notify }) {
+  const [st, reload] = useData('mailStatus')
+  const [pw, setPw] = useState('')
+  const [test, setTest] = useState(null)
+  const [busy, setBusy] = useState(null)
+  if (!st) return null
+  const mb = st.mailbox
+  const preset = st.presets[mb.provider] || st.presets.other
+  const save = async (patch) => {
+    try {
+      await call('saveMailbox', patch)
+      reload()
+    } catch (e) {
+      notify(e.message)
+    }
+  }
+  const run = (name, fn) => async () => {
+    setBusy(name)
+    try {
+      await fn()
+    } catch (e) {
+      notify(e.message)
+    } finally {
+      setBusy(null)
+      reload()
+    }
+  }
+  const last = st.worker?.lastSend
+  const check = st.worker?.lastCheck || st.last_check
+  return (
+    <section className="panel set">
+      <div className="set-head">
+        <h2>Your mailbox</h2>
+        <p className="small dim">Email goes out from your own mailbox, one at a time at a human pace, while Fitscout is open. Replies are read back every few minutes: they rank the lead, stop follow-ups, and anyone who says “stop” goes on do-not-contact. Your password is encrypted by Windows and never leaves this PC.</p>
+      </div>
+      <div className="form-grid two">
+        <label>
+          <span>Provider</span>
+          <select value={mb.provider} onChange={(e) => save({ provider: e.target.value })}>
+            {Object.entries(st.presets).map(([k, p]) => <option key={k} value={k}>{p.label}</option>)}
+          </select>
+        </label>
+        <label>
+          <span>Email address (sign-in)</span>
+          <input defaultValue={mb.user} key={mb.user} placeholder="you@yourbusiness.com" onBlur={(e) => e.target.value !== mb.user && save({ user: e.target.value })} />
+        </label>
+        {mb.provider === 'other' && (
+          <>
+            <label><span>SMTP server</span><input defaultValue={mb.smtp_host} onBlur={(e) => save({ smtp_host: e.target.value })} /></label>
+            <label><span>SMTP port</span><input type="number" defaultValue={mb.smtp_port} onBlur={(e) => save({ smtp_port: e.target.value, smtp_secure: Number(e.target.value) === 465 })} /></label>
+            <label><span>IMAP server</span><input defaultValue={mb.imap_host} onBlur={(e) => save({ imap_host: e.target.value })} /></label>
+            <label><span>IMAP port</span><input type="number" defaultValue={mb.imap_port} onBlur={(e) => save({ imap_port: e.target.value })} /></label>
+          </>
+        )}
+        <label className="wide">
+          <span>{st.hasPassword ? 'Password saved (encrypted). Enter a new one to replace it.' : 'App password'}</span>
+          <div className="form-row tight">
+            <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder={st.hasPassword ? '••••••••' : 'App password'} autoComplete="off" />
+            <button className="btn" disabled={!pw || busy} onClick={run('pw', async () => { await call('setMailPassword', { password: pw }); setPw(''); notify('Password saved, encrypted on this PC.', 'ok') })}>Save password</button>
+            {st.hasPassword && <button className="btn btn-quiet" onClick={run('clear', () => call('clearMailPassword'))}>Forget</button>}
+          </div>
+          {preset.note && <span className="small dim">{preset.note}</span>}
+        </label>
+      </div>
+      <div className="form-actions">
+        <button className="btn" disabled={!st.ready || !st.hasPassword || !!busy} onClick={run('test', async () => setTest(await call('testMailbox')))}>{busy === 'test' ? 'Testing…' : 'Test connection'}</button>
+        <label className="switch">
+          <input type="checkbox" checked={!!mb.auto_send} disabled={!st.ready || !st.hasPassword} onChange={(e) => save({ auto_send: e.target.checked })} />
+          <span>Send approved emails automatically</span>
+        </label>
+        <button className="btn btn-quiet" disabled={!st.ready || !st.hasPassword || !!busy} onClick={run('check', async () => {
+          const r = await call('checkRepliesNow')
+          notify(r?.error ? r.error : `Checked ${r?.checked || 0} new messages: ${r?.replies || 0} replies, ${r?.bounces || 0} bounces.`, r?.error ? 'error' : 'ok')
+        })}>{busy === 'check' ? 'Checking…' : 'Check replies now'}</button>
+      </div>
+      {test && (
+        <p className="small">
+          Sending (SMTP): {test.smtp.ok ? <span className="ok">connected</span> : <span className="bad">{test.smtp.error}</span>} · Reading (IMAP): {test.imap.ok ? <span className="ok">connected</span> : <span className="bad">{test.imap.error}</span>}
+        </p>
+      )}
+      <p className="mono small dim">
+        {st.approved_waiting} approved · {st.due_now} due now · {st.remaining_today} left today
+        {last?.sent ? ` · last sent to ${last.to}` : last?.error ? ` · last attempt failed: ${last.error}` : ''}
+        {check?.at ? ` · replies checked ${new Date(check.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}
+        {st.failed ? ` · ${st.failed} failed` : ''}
+      </p>
     </section>
   )
 }

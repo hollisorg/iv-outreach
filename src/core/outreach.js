@@ -5,8 +5,9 @@
 //  * Nothing is sent without an approval.
 //  * Email goes from the user's own mailbox with their real name, company and postal
 //    address, plus a one-reply opt-out (CAN-SPAM).
-//  * LinkedIn is assisted, not automated: Fitscout drafts the note and opens the
-//    profile; the person sends it themselves. LinkedIn's terms forbid automated messaging.
+//  * Socials (LinkedIn, Facebook, Instagram, X, TikTok) are assisted, not automated: Fitscout
+//    drafts the note and opens the profile or DM; the person sends it themselves. The platforms'
+//    terms forbid automated messaging, and bot-sent DMs get personal accounts restricted.
 //  * Suppressed people are never contacted, from any campaign.
 import { now, newId, tx, logEvent, getSetting, setSetting } from './db.js'
 import { isSuppressed, suppress } from './suppression.js'
@@ -22,8 +23,32 @@ export const DEFAULT_SENDER = {
   signature: '',
   daily_email_cap: 30,
   daily_linkedin_cap: 20,
+  daily_social_cap: 20, // per platform: Facebook, Instagram, X, TikTok each
   followup_days: 3,
   recontact_days: 90,
+}
+
+export const SOCIAL_CHANNELS = ['linkedin', 'facebook', 'instagram', 'x', 'tiktok']
+export const CHANNEL_NAMES = { email: 'Email', linkedin: 'LinkedIn', facebook: 'Facebook', instagram: 'Instagram', x: 'X', tiktok: 'TikTok' }
+const SOCIAL_LIMITS = { facebook: 2000, instagram: 1000, x: 10000, tiktok: 500 }
+
+const parseSocials = (lead) => lead.socials || (() => {
+  try { return JSON.parse(lead.socials_json || '{}') } catch { return {} }
+})()
+
+// The profile a social message goes to, and the link that opens a DM to it where the platform has one.
+export function socialTarget(lead, channel) {
+  if (channel === 'linkedin') return lead.linkedin_url ? { profile: lead.linkedin_url, open: lead.linkedin_url } : null
+  const profile = parseSocials(lead)[channel]
+  if (!profile) return null
+  let open = profile
+  try {
+    const u = new URL(profile)
+    const handle = u.pathname.split('/').filter(Boolean)[0]
+    if (channel === 'facebook' && handle && !['profile.php', 'pages', 'groups', 'people'].includes(handle)) open = `https://m.me/${handle}`
+    if (channel === 'instagram' && handle) open = `https://ig.me/m/${handle}`
+  } catch { /* keep the profile link */ }
+  return { profile, open }
 }
 
 export function getSender(db) {
@@ -41,6 +66,7 @@ export function saveSender(db, patch) {
   // Hard ceilings: past these, a single mailbox or account starts to look like a spam source.
   next.daily_email_cap = Math.min(next.daily_email_cap, 75)
   next.daily_linkedin_cap = Math.min(next.daily_linkedin_cap, 25)
+  next.daily_social_cap = Math.min(next.daily_social_cap, 25)
   next.followup_days = Math.max(next.followup_days, 2)
   setSetting(db, 'sender', next)
   return next
@@ -80,13 +106,19 @@ export function lintDraft({ channel, step, subject, body }, lead, db) {
     if (subject && subject.length > 90) warn('Subject is long (over 90 characters)')
     if (body && body.length > 1800) warn('Body is long for a cold email (over 1,800 characters)')
     if ((body?.match(/https?:\/\//g) || []).length > 2) warn('More than two links (hurts deliverability)')
-  } else {
+  } else if (channel === 'linkedin') {
     if (!lead.linkedin_url) block('Lead has no LinkedIn profile URL')
     if (step === 1 && body && body.length > 300) block('LinkedIn connection notes max out at 300 characters')
     if (body && body.length > 1900) block('LinkedIn messages max out at about 1,900 characters')
+  } else {
+    const name = CHANNEL_NAMES[channel] || channel
+    if (!socialTarget(lead, channel)) block(`Lead has no ${name} profile (find their socials first)`)
+    if (body && body.length > SOCIAL_LIMITS[channel]) block(`${name} messages max out at ${SOCIAL_LIMITS[channel].toLocaleString('en-US')} characters`)
   }
   const blocked = isSuppressed(db, lead)
   if (blocked) block(`On the do-not-contact list (${blocked.kind})`)
+  else if (lead.status === 'suppressed') block('Marked do not contact')
+  if (channel === 'email' && lead.email_status === 'bounced') block('This email address bounced')
   if (channel === 'email' && step === 1 && lead.email) {
     const sender = getSender(db)
     const since = new Date(Date.now() - sender.recontact_days * 864e5).toISOString()
@@ -103,7 +135,7 @@ export function saveDrafts(db, drafts) {
     for (const d of drafts) {
       const lead = db.prepare('select * from leads where id = ?').get(d.lead_id)
       if (!lead) { saved.push({ lead_id: d.lead_id, error: 'No such lead' }); continue }
-      const channel = d.channel === 'linkedin' ? 'linkedin' : 'email'
+      const channel = SOCIAL_CHANNELS.includes(d.channel) ? d.channel : 'email'
       const step = Math.max(1, Math.min(5, Number(d.step) || 1))
       const subject = channel === 'email' ? clip(d.subject?.trim() || null, 200) : null
       const body = String(d.body || '').trim()
@@ -210,10 +242,10 @@ function followupDue(db, m, sender) {
 
 export function dueMessages(db, channel) {
   const sender = getSender(db)
-  const cap = channel === 'email' ? sender.daily_email_cap : sender.daily_linkedin_cap
+  const cap = channel === 'email' ? sender.daily_email_cap : channel === 'linkedin' ? sender.daily_linkedin_cap : sender.daily_social_cap
   const remaining = Math.max(0, cap - sentToday(db, channel))
   if (!remaining) return { remaining: 0, cap, messages: [] }
-  const approved = db.prepare(`select m.*, l.name, l.company, l.email, l.linkedin_url, l.domain
+  const approved = db.prepare(`select m.*, l.name, l.company, l.email, l.linkedin_url, l.domain, l.socials_json
     from messages m join leads l on l.id = m.lead_id
     where m.channel = ? and m.status = 'approved' order by m.step, m.approved_at`).all(channel)
   const due = []
@@ -228,17 +260,29 @@ export function dueMessages(db, channel) {
   return { remaining, cap, messages: due }
 }
 
-export function linkedinQueue(db) {
-  const { remaining, cap, messages } = dueMessages(db, 'linkedin')
-  return {
-    remaining_today: remaining,
-    daily_cap: cap,
-    how_it_works: 'Open each profile, paste the note, and send it yourself. Then mark it sent here.',
-    items: messages.map((m) => ({
-      message_id: m.id, lead_id: m.lead_id, name: m.name, company: m.company, step: m.step,
-      profile_url: m.linkedin_url, note: m.body, kind: m.step === 1 ? 'connection note' : 'message',
-    })),
+// The social send list: every approved LinkedIn, Facebook, Instagram, X and TikTok note due today, each with the
+// link that opens the profile or DM. The person sends each one themselves and marks it sent.
+export function socialQueue(db, { channel = null } = {}) {
+  const channels = channel ? [channel] : SOCIAL_CHANNELS
+  const out = { how_it_works: 'Open each profile or DM, paste the note, and send it yourself. Then mark it sent here.', channels: {}, items: [] }
+  for (const ch of channels) {
+    const { remaining, cap, messages } = dueMessages(db, ch)
+    out.channels[ch] = { remaining_today: remaining, daily_cap: cap, sent_today: sentToday(db, ch) }
+    for (const m of messages) {
+      const target = socialTarget(m, ch)
+      out.items.push({
+        message_id: m.id, lead_id: m.lead_id, name: m.name, company: m.company, step: m.step, channel: ch,
+        channel_name: CHANNEL_NAMES[ch], profile_url: target?.profile || null, open_url: target?.open || null,
+        note: m.body, kind: ch === 'linkedin' ? (m.step === 1 ? 'connection note' : 'message') : 'direct message',
+      })
+    }
   }
+  return out
+}
+
+export function linkedinQueue(db) {
+  const q = socialQueue(db, { channel: 'linkedin' })
+  return { remaining_today: q.channels.linkedin.remaining_today, daily_cap: q.channels.linkedin.daily_cap, how_it_works: q.how_it_works, items: q.items }
 }
 
 export function composeEmail(db, m) {

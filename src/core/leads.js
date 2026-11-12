@@ -57,9 +57,13 @@ function findDuplicate(db, campaignId, lead) {
     const hit = db.prepare('select id from leads where campaign_id = ? and linkedin_url = ?').get(campaignId, lead.linkedin_url)
     if (hit) return hit.id
   }
-  // Same business with no person attached: one lead per domain.
+  // Same business with no person attached: one lead per domain, or per name + phone when there's no website.
   if (lead.domain && !lead.name && !lead.email && !lead.linkedin_url) {
     const hit = db.prepare(`select id from leads where campaign_id = ? and domain = ? and name is null`).get(campaignId, lead.domain)
+    if (hit) return hit.id
+  }
+  if (!lead.domain && lead.company && lead.phone && !lead.name) {
+    const hit = db.prepare(`select id from leads where campaign_id = ? and company = ? and phone = ?`).get(campaignId, lead.company, lead.phone)
     if (hit) return hit.id
   }
   return null

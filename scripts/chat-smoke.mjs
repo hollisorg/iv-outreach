@@ -31,7 +31,7 @@ turn = startChatTurn({
   engine,
   exe,
   dir: join(data, 'chats', 'smoke'),
-  message: `Call fitscout_overview, then approve the one waiting draft with fitscout_approve_messages (message id ${draft.message_id}). Then tell me in one sentence what happened.`,
+  message: process.argv[4] ? `${process.argv[4]} (Campaign id: ${c.id})` : `Call fitscout_overview, then approve the one waiting draft with fitscout_approve_messages (message id ${draft.message_id}). Then tell me in one sentence what happened.`,
   context: { page: 'approve', campaignId: c.id, campaignName: c.name },
   mcp: { command: process.execPath, args: [server], env: { FITSCOUT_DATA_DIR: data } },
   onEvent: (e) => {

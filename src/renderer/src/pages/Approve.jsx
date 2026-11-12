@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react'
 import { call, useData, askAgent } from '../api'
+import emptyArt from '../assets/empty-approve.webp'
+
+const CH = { email: 'Email', linkedin: 'LinkedIn', facebook: 'Facebook', instagram: 'Instagram', x: 'X', tiktok: 'TikTok' }
+const LIMIT = { facebook: 2000, instagram: 1000, x: 10000, tiktok: 500 }
 
 export default function Approve({ campaign, overview, notify, go, openChat }) {
   const [drafts, reload] = useData('listMessages', { campaign_id: campaign?.id, status: 'draft' }, [campaign?.id])
@@ -11,7 +15,7 @@ export default function Approve({ campaign, overview, notify, go, openChat }) {
       const r = await call('approveMessages', { ids })
       const no = r.filter((x) => !x.approved)
       if (no.length) notify(no[0].reason)
-      else notify(`Approved ${r.length}. Emails wait in the send queue until mailbox sending is connected; LinkedIn notes go to your send list.`, 'ok')
+      else notify(`Approved ${r.length}. Emails send from your mailbox within your daily cap; social notes go to the Social list.`, 'ok')
       reload()
     } catch (e) {
       notify(e.message)
@@ -40,9 +44,13 @@ export default function Approve({ campaign, overview, notify, go, openChat }) {
       {!drafts ? (
         <p className="dim">Loading…</p>
       ) : !drafts.length ? (
-        <div className="empty">
-          <p>No drafts waiting.</p>
-          <button className="btn" onClick={() => (openChat(), askAgent({ text: 'Draft short first emails for my best-fit researched leads.' }))}>Ask the agent to draft some</button>
+        <div className="empty art">
+          <img src={emptyArt} alt="" width="200" height="200" />
+          <div>
+            <p className="empty-title">No drafts waiting.</p>
+            <p className="dim">Drafts the agent writes land here for your OK. Nothing sends until you approve it.</p>
+            <button className="btn" onClick={() => (openChat(), askAgent({ text: 'Draft short first emails for my best-fit researched leads.' }))}>Ask the agent to draft some</button>
+          </div>
         </div>
       ) : (
         <div className="drafts">
@@ -63,7 +71,7 @@ function Draft({ d, onApprove, onChanged, notify }) {
   const dirty = subject !== (d.subject || '') || body !== d.body
   const blocks = d.issues.filter((i) => i.level === 'block')
   const warns = d.issues.filter((i) => i.level === 'warn')
-  const limit = d.channel === 'linkedin' && d.step === 1 ? 300 : null
+  const limit = d.channel === 'linkedin' ? (d.step === 1 ? 300 : 1900) : LIMIT[d.channel] || null
   const save = async () => {
     try {
       await call('editMessage', { id: d.id, subject, body })
@@ -80,11 +88,11 @@ function Draft({ d, onApprove, onChanged, notify }) {
           <span className="small dim"> {d.lead_name ? `· ${d.lead_company || ''}` : ''}</span>
         </div>
         <span className="mono small">
-          <span className={`chan ${d.channel}`}>{d.channel === 'email' ? 'Email' : 'LinkedIn'}</span> step {d.step}
+          <span className={`chan ${d.channel}`}>{CH[d.channel] || d.channel}</span> step {d.step}
           {d.fit_score != null && <span className="dim"> · fit {d.fit_score}</span>}
         </span>
       </header>
-      <p className="mono small dim to">{d.channel === 'email' ? `To ${d.lead_email || 'no email'}` : d.lead_linkedin_url?.replace('https://www.', '') || 'no LinkedIn profile'}</p>
+      <p className="mono small dim to">{d.channel === 'email' ? `To ${d.lead_email || 'no email'}` : d.channel === 'linkedin' ? d.lead_linkedin_url?.replace('https://www.', '') || 'no LinkedIn profile' : `Sent by you from the Social list`}</p>
       {d.channel === 'email' && <input className="subject" value={subject} onChange={(e) => setSubject(e.target.value)} aria-label="Subject" />}
       <textarea value={body} rows={Math.min(12, Math.max(4, body.split('\n').length + 1))} onChange={(e) => setBody(e.target.value)} aria-label="Message" />
       {limit && <p className={`mono small ${body.length > limit ? 'bad' : 'dim'}`}>{body.length}/{limit}</p>}

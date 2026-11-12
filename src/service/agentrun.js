@@ -80,11 +80,12 @@ export function codexChatArgs({ mcp, model = '', resume = null }) {
 // Approving is the one that matters most: it's what lets outreach go out under the person's name.
 export function chatAsk(name, args = {}) {
   const n = (k) => (Array.isArray(args[k]) ? args[k].length : 0)
-  if (name === 'fitscout_approve_messages') return `This approves ${n('message_ids')} message${n('message_ids') === 1 ? '' : 's'} to go out under your name. Approved emails wait in Fitscout's send queue (mailbox sending is the next update); LinkedIn notes go on your send list.`
+  if (name === 'fitscout_approve_messages') return `This approves ${n('message_ids')} message${n('message_ids') === 1 ? '' : 's'} to go out under your name. Emails send from your connected mailbox within your daily cap; social notes go on your send list for you to send.`
   if (name === 'fitscout_cancel_messages') return `This cancels ${n('message_ids')} unsent message${n('message_ids') === 1 ? '' : 's'}.`
   if (name === 'fitscout_sender_profile' && Object.keys(args).length) return 'This changes your sender profile (who outreach comes from, your postal address or your daily caps).'
   if (name === 'fitscout_update_campaign' && args.status) return `This sets the campaign to ${args.status}.`
-  if (name === 'fitscout_mark_linkedin_sent') return 'This records that you sent these LinkedIn notes yourself.'
+  if (name === 'fitscout_mark_linkedin_sent') return 'This records that you sent these social messages yourself.'
+  if (name === 'fitscout_use_social') return `This sets ${args.url || 'that profile'} as the lead's ${args.channel || 'social'} profile, so messages for it go there.`
   if (name === 'fitscout_export_csv') return 'This writes your leads to a file on this PC.'
   return null
 }
@@ -109,7 +110,12 @@ const LABELS = {
   fitscout_cancel_messages: 'Cancelled messages',
   fitscout_email_queue: 'Checked the email queue',
   fitscout_linkedin_queue: 'Checked the LinkedIn list',
-  fitscout_mark_linkedin_sent: 'Marked LinkedIn notes sent',
+  fitscout_mark_linkedin_sent: 'Marked messages sent',
+  fitscout_social_queue: 'Checked the social send list',
+  fitscout_find_on_google_maps: 'Searched Google Maps',
+  fitscout_find_socials: 'Looked up their socials',
+  fitscout_use_social: 'Set a social profile',
+  fitscout_mail_status: 'Checked the mailbox',
   fitscout_log_reply: 'Logged a reply',
   fitscout_suppress: 'Added to do-not-contact',
   fitscout_export_csv: 'Exported leads',

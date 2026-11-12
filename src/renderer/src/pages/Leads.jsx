@@ -1,11 +1,42 @@
 import { useEffect, useState } from 'react'
 import { call, useData, when, STATUS, askAgent } from '../api'
+import emptyArt from '../assets/empty-leads.webp'
 
 const SORTS = [
   ['rank', 'Call first'],
   ['fit', 'Best fit'],
   ['newest', 'Newest'],
 ]
+
+function MapsSearch({ campaign, notify, onDone }) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const [near, setNear] = useState('')
+  const [busy, setBusy] = useState(false)
+  const run = async () => {
+    if (!query.trim()) return
+    setBusy(true)
+    try {
+      const r = await call('searchMaps', { campaign_id: campaign.id, query: near.trim() ? `${query.trim()} in ${near.trim()}` : query.trim(), near: near.trim() || undefined })
+      notify(r.found ? `Google Maps: ${r.found} businesses, ${r.added} new${r.duplicates ? `, ${r.duplicates} already here` : ''}.` : r.note || 'No listings came back.', r.found ? 'ok' : 'error')
+      onDone()
+      if (r.found) setOpen(false)
+    } catch (e) {
+      notify(e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  if (!open) return <button className="btn btn-primary" onClick={() => setOpen(true)}>Find on Google Maps</button>
+  return (
+    <form className="maps-form" onSubmit={(e) => (e.preventDefault(), run())}>
+      <input autoFocus placeholder="What, e.g. HVAC contractors" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Business type" />
+      <input placeholder="Where, e.g. Dublin, Ohio" value={near} onChange={(e) => setNear(e.target.value)} aria-label="Place" />
+      <button className="btn btn-primary" disabled={busy || !query.trim()}>{busy ? 'Searching…' : 'Search'}</button>
+      <button type="button" className="btn btn-quiet" onClick={() => setOpen(false)}>Cancel</button>
+    </form>
+  )
+}
 
 export default function Leads({ campaign, leadId, setLeadId, notify, openChat }) {
   const [sort, setSort] = useState('rank')
@@ -29,6 +60,7 @@ export default function Leads({ campaign, leadId, setLeadId, notify, openChat })
           <h1>Leads</h1>
         </div>
         <div className="head-actions">
+          <MapsSearch campaign={campaign} notify={notify} onDone={reload} />
           <div className="segmented" role="radiogroup" aria-label="Sort">
             {SORTS.map(([id, label]) => (
               <button key={id} role="radio" aria-checked={sort === id} className={sort === id ? 'on' : ''} onClick={() => setSort(id)}>{label}</button>
@@ -48,9 +80,13 @@ export default function Leads({ campaign, leadId, setLeadId, notify, openChat })
       {!leads ? (
         <p className="dim">Loading…</p>
       ) : !leads.length ? (
-        <div className="empty">
-          <p>No leads in this campaign yet.</p>
-          <button className="btn btn-primary" onClick={() => (openChat(), askAgent({ text: 'Find 15 real businesses that fit this campaign and add them.' }))}>Ask the agent to find some</button>
+        <div className="empty art">
+          <img src={emptyArt} alt="" width="200" height="200" />
+          <div>
+            <p className="empty-title">No leads in this campaign yet.</p>
+            <p className="dim">Search Google Maps above, drop a CSV in, or let the agent research the web for you.</p>
+            <button className="btn" onClick={() => (openChat(), askAgent({ text: 'Find 15 real businesses that fit this campaign and add them.' }))}>Ask the agent to find some</button>
+          </div>
         </div>
       ) : (
         <div className="table-wrap">
@@ -72,14 +108,18 @@ export default function Leads({ campaign, leadId, setLeadId, notify, openChat })
                   <td className="num mono dim">{i + 1}</td>
                   <td>
                     <div className="who">{l.name || l.company || l.website}</div>
-                    <div className="small dim">{[l.name ? l.company : null, l.title, l.location].filter(Boolean).join(' · ')}</div>
+                    <div className="small dim">
+                      {[l.name ? l.company : null, l.title, l.category, l.location].filter(Boolean).join(' · ')}
+                      {l.rating != null && <span className="stars"> · {l.rating}★ <span className="dim">({l.review_count})</span></span>}
+                    </div>
                   </td>
                   <td><span className={`chip st-${l.status}`}>{STATUS[l.status]}</span></td>
                   <td className="num"><Score n={l.fit_score} /></td>
                   <td className="num"><Score n={l.first_reply_at ? l.engagement_score : null} warm /></td>
                   <td className="reach mono small">
-                    <span className={l.email ? '' : 'off'} title={l.email || 'No email'}>@</span>
+                    <span className={l.email && l.email_status !== 'bounced' ? '' : 'off'} title={l.email ? `${l.email}${l.email_status === 'bounced' ? ' (bounced)' : ''}` : 'No email'}>@</span>
                     <span className={l.linkedin_url ? '' : 'off'} title={l.linkedin_url || 'No LinkedIn'}>in</span>
+                    <span className={['facebook', 'instagram', 'x', 'tiktok'].some((k) => l.socials?.[k]) ? '' : 'off'} title={['facebook', 'instagram', 'x', 'tiktok'].filter((k) => l.socials?.[k]).join(', ') || 'No other socials'}>#</span>
                   </td>
                   <td className="small dim">{when(l.last_contacted_at)}</td>
                 </tr>
@@ -106,6 +146,76 @@ function Score({ n, warm }) {
       <span className="score-bar" aria-hidden="true"><span style={{ width: `${n}%` }} /></span>
       <span className="mono">{n}</span>
     </span>
+  )
+}
+
+const CHANNELS = { email: 'Email', linkedin: 'LinkedIn', facebook: 'Facebook', instagram: 'Instagram', x: 'X', tiktok: 'TikTok', youtube: 'YouTube', pinterest: 'Pinterest', threads: 'Threads', phone: 'Phone', other: 'Other' }
+const PROFILE_KEYS = ['facebook', 'instagram', 'x', 'tiktok', 'youtube', 'pinterest', 'threads']
+
+// The lead's social profiles: confirmed ones (from its own site, or confirmed by you), and same-handle accounts the
+// lookup found elsewhere, which stay unconfirmed until you say they're this business.
+function Socials({ lead, notify, onChanged }) {
+  const [busy, setBusy] = useState(false)
+  const [handle, setHandle] = useState('')
+  const s = lead.socials || {}
+  const confirmed = PROFILE_KEYS.filter((k) => s[k]).map((k) => [k, s[k]])
+  const unconfirmed = (s.found || []).filter((f) => !f.confirmed)
+  const find = async () => {
+    setBusy(true)
+    try {
+      const r = await call('findSocials', { id: lead.id, handles: handle.trim() ? [handle.trim()] : undefined })
+      const n = r.results.reduce((a, x) => a + x.found.length, 0)
+      notify(`Checked ${r.results.reduce((a, x) => a + x.sites_checked, 0)} sites for ${r.handles.map((h) => `@${h.handle}`).join(', ')}: ${n} profile${n === 1 ? '' : 's'} found.`, 'ok')
+      onChanged()
+    } catch (e) {
+      notify(e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <section className="socials">
+      <h3>Socials</h3>
+      {confirmed.length > 0 ? (
+        <ul className="social-links">
+          {confirmed.map(([k, url]) => (
+            <li key={k}>
+              <span className={`chan ${k}`}>{CHANNELS[k]}</span>
+              <button className="link-btn mono small" onClick={() => call('openSocial', { url }).catch((e) => notify(e.message))}>{url.replace(/^https:\/\/(www\.)?/, '')}</button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="small dim">None confirmed yet.</p>
+      )}
+      <div className="form-row">
+        <input value={handle} onChange={(e) => setHandle(e.target.value)} placeholder="Handle (optional), e.g. ableplumbing" aria-label="Handle to look up" />
+        <button className="btn" disabled={busy} onClick={find}>{busy ? 'Checking ~480 sites…' : 'Find their socials'}</button>
+      </div>
+      {unconfirmed.length > 0 && (
+        <details className="unconfirmed">
+          <summary className="small">{unconfirmed.length} same-handle account{unconfirmed.length === 1 ? '' : 's'} elsewhere (not confirmed, often someone else)</summary>
+          <ul>
+            {unconfirmed.slice(0, 40).map((f) => (
+              <li key={f.url} className="small">
+                <span className="mono">{f.site}</span>
+                <button className="link-btn mono small" onClick={() => call('openSocial', { url: f.url }).catch(() => notify('Only social platform links open from here. Copy it instead.'))}>{f.url.replace(/^https?:\/\/(www\.)?/, '')}</button>
+                {f.channel && (
+                  <button className="btn btn-small" onClick={async () => {
+                    try {
+                      await call('useSocial', { id: lead.id, channel: f.channel, url: f.url })
+                      onChanged()
+                    } catch (e) {
+                      notify(e.message)
+                    }
+                  }}>Use this</button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </section>
   )
 }
 
@@ -146,11 +256,14 @@ function LeadDrawer({ id, onClose, notify, onChanged }) {
       <dl className="facts">
         <div><dt>Status</dt><dd><span className={`chip st-${lead.status}`}>{STATUS[lead.status]}</span></dd></div>
         <div><dt>Fit</dt><dd>{lead.fit_score ?? '–'}{lead.fit_reason && <span className="small dim"> · {lead.fit_reason}</span>}</dd></div>
+        {lead.rating != null && <div><dt>Google</dt><dd>{lead.rating}★ from {lead.review_count} reviews{lead.category && <span className="small dim"> · {lead.category}</span>}</dd></div>}
+        {lead.phone && <div><dt>Phone</dt><dd className="mono small">{lead.phone}</dd></div>}
         <div><dt>Email</dt><dd className="mono small">{lead.email || '–'}{lead.email && <span className="dim"> ({lead.email_status.replace(/_/g, ' ')})</span>}</dd></div>
         <div><dt>LinkedIn</dt><dd className="mono small">{lead.linkedin_url ? lead.linkedin_url.replace('https://www.', '') : '–'}</dd></div>
         <div><dt>Website</dt><dd className="mono small">{lead.website || '–'}</dd></div>
         {lead.source_url && <div><dt>Found on</dt><dd className="mono small">{lead.source_url}</dd></div>}
       </dl>
+      <Socials lead={lead} notify={notify} onChanged={() => (reload(), onChanged())} />
       {lead.site_summary && (
         <section>
           <h3>From their site</h3>
@@ -163,7 +276,7 @@ function LeadDrawer({ id, onClose, notify, onChanged }) {
           <h3>Messages</h3>
           {lead.messages.map((m) => (
             <div key={m.id} className="msg-mini">
-              <span className="mono small">{m.channel === 'email' ? 'Email' : 'LinkedIn'} · step {m.step} · {m.status}</span>
+              <span className="mono small">{CHANNELS[m.channel] || m.channel} · step {m.step} · {m.status}</span>
               {m.subject && <strong className="small">{m.subject}</strong>}
               <p className="small">{m.body}</p>
             </div>
@@ -186,7 +299,7 @@ function LeadDrawer({ id, onClose, notify, onChanged }) {
           <h3>Log a reply</h3>
           <div className="form-row">
             <select value={reply.channel} onChange={(e) => setReply({ ...reply, channel: e.target.value })} aria-label="Channel">
-              <option value="email">Email</option><option value="linkedin">LinkedIn</option><option value="phone">Phone</option><option value="other">Other</option>
+              {['email', 'linkedin', 'facebook', 'instagram', 'x', 'tiktok', 'phone', 'other'].map((c) => <option key={c} value={c}>{CHANNELS[c]}</option>)}
             </select>
             <select value={reply.intent} onChange={(e) => setReply({ ...reply, intent: e.target.value, sentiment: ['not_interested', 'unsubscribe'].includes(e.target.value) ? 'negative' : ['interested', 'meeting'].includes(e.target.value) ? 'positive' : 'neutral' })} aria-label="What they said">
               {INTENTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}

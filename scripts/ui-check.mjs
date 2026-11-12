@@ -18,7 +18,7 @@ const { added } = fs.addLeads(db, c.id, [
   { name: 'Ann Able', title: 'Owner', company: 'Able Plumbing (demo)', email: 'ann@able.test', location: 'Columbus, OH', source: 'claude_research', website: 'able.test' },
   { name: 'Ben Brook', title: 'Owner', company: 'Brook Drains (demo)', email: 'ben@brook.test', linkedin_url: 'https://www.linkedin.com/in/demo-ben', location: 'Dublin, OH', source: 'claude_research' },
   { name: 'Cara Cole', title: 'Founder', company: 'Cole Pipe Co (demo)', linkedin_url: 'https://www.linkedin.com/in/demo-cara', location: 'Westerville, OH', source: 'csv' },
-  { company: 'Delta Rooter (demo)', email: 'info@delta.test', location: 'Hilliard, OH', source: 'claude_research' },
+  { company: 'Delta Rooter (demo)', email: 'info@delta.test', location: 'Hilliard, OH', source: 'google_maps', phone: '(614) 555-0142' },
   { name: 'Eli East', title: 'Owner', company: 'East Side Plumbing (demo)', email: 'eli@east.test', location: 'Columbus, OH', source: 'claude_research' },
 ])
 fs.setFitScores(db, added.map((id, i) => ({ lead_id: id, fit_score: [92, 81, 74, 66, 58][i], reason: 'Demo reason: owner-operated, 5-20 techs, service area matches.' })))
@@ -29,6 +29,10 @@ const drafts = fs.saveDrafts(db, [
   { lead_id: added[4], channel: 'email', subject: 'Hi', body: 'Hi {{first_name}}, demo.' },
 ])
 // one already contacted and replied, one LinkedIn note approved and waiting
+db.prepare('update leads set rating = 4.7, review_count = 212, category = ? where company = ?').run('Plumber', 'Delta Rooter (demo)')
+db.prepare('update leads set socials_json = ? where id = ?').run(JSON.stringify({ instagram: 'https://www.instagram.com/demo.east.plumbing/', found: [{ site: 'TikTok', url: 'https://www.tiktok.com/@eastplumbingdemo', handle: 'eastplumbingdemo', confirmed: false, channel: 'tiktok' }] }), added[4])
+const [ig] = fs.saveDrafts(db, [{ lead_id: added[4], channel: 'instagram', body: 'Hi Eli, loved the before-and-after reel on the water heater swap. Demo DM for a UI check.' }])
+fs.approveMessages(db, [ig.message_id])
 const [sent] = fs.saveDrafts(db, [{ lead_id: added[3], channel: 'email', subject: 'Demo', body: 'Demo sent message.' }])
 fs.approveMessages(db, [sent.message_id, drafts[2].message_id])
 fs.markSent(db, sent.message_id, { at: new Date(Date.now() - 3 * 3600e3).toISOString() })
@@ -47,13 +51,16 @@ const shot = async (name) => {
   await win.screenshot({ path: join(out, `${name}.png`) })
 }
 await shot('1-today')
-for (const [label, name] of [['Leads', '2-leads'], ['Approve', '3-approve'], ['LinkedIn', '4-linkedin'], ['Settings', '5-settings']]) {
+for (const [label, name] of [['Leads', '2-leads'], ['Approve', '3-approve'], ['Social', '4-social'], ['Settings', '5-settings']]) {
   await win.click(`.nav button:has-text("${label}")`)
   await shot(name)
 }
 await win.click('.nav button:has-text("Leads")')
 await win.click('tr:has-text("Delta Rooter")')
 await shot('6-lead-drawer')
+await win.click('.nav button:has-text("Settings")')
+await win.locator('.panel:has-text("Your mailbox")').scrollIntoViewIfNeeded()
+await shot('5b-mailbox')
 await win.keyboard.press('Escape')
 await win.click('.nav button:has-text("Today")')
 await shot('7-today-fixed')

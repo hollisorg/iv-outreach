@@ -6,3 +6,5 @@ data/
 *.db-wal
 *.db-shm
 .env*
+vendor/gmaps/*.exe
+build/icon-256.png

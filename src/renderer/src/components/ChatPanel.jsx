@@ -14,12 +14,12 @@ const timeOf = (at) => (at ? new Date(at).toLocaleTimeString(undefined, { hour: 
 const IDEAS = {
   today: [
     'Build me a campaign from a franchise website',
-    'Find 15 independent plumbing shops in Columbus, Ohio that look like a fit',
+    'Search Google Maps for HVAC contractors around Dublin, Ohio and score them',
     'What should I do next?',
   ],
   leads: ['Research the leads that haven’t been looked at yet', 'Score fit for every lead without a score', 'Who should I call first, and why?'],
   approve: ['Draft a first email for every researched lead', 'Make these drafts shorter and warmer', 'Write LinkedIn connection notes for leads with a profile'],
-  linkedin: ['Write LinkedIn notes for my top 10 leads by fit', 'Which LinkedIn leads haven’t I reached yet?'],
+  social: ['Find socials for my top 10 leads and write Instagram or Facebook DMs', 'Write LinkedIn notes for my top 10 leads by fit'],
   settings: ['Help me finish my sender profile', 'What does Fitscout need from me before I can send?'],
 }
 

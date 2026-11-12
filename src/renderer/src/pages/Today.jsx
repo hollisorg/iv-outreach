@@ -1,4 +1,5 @@
 import { askAgent, when, STATUS } from '../api'
+import hero from '../assets/welcome-hero.webp'
 
 export default function Today({ campaign, overview, go, openChat }) {
   if (!overview) return <div className="page"><p className="dim">Loading…</p></div>
@@ -31,6 +32,13 @@ export default function Today({ campaign, overview, go, openChat }) {
 
       {!c ? (
         <section className="start">
+          <div className="hero" style={{ backgroundImage: `url(${hero})` }}>
+            <div className="hero-copy">
+              <p className="eyebrow">Fitscout</p>
+              <h2>Find the businesses that fit. Reach the ones who answer.</h2>
+              <p className="small">Google Maps listings, web research and your own lists, scored for fit, written to by hand, and ranked by who replies.</p>
+            </div>
+          </div>
           <h2>Three ways to start</h2>
           <div className="start-grid">
             <button className="start-card" onClick={() => ask('Build me a campaign from this franchise website: ')}>
@@ -41,7 +49,7 @@ export default function Today({ campaign, overview, go, openChat }) {
             <button className="start-card" onClick={() => ask('My best customers are ')}>
               <span className="num mono">02</span>
               <span className="start-title">Describe your customers</span>
-              <span className="small dim">Industry, owner titles, cities or ZIPs, company size. Plain words are fine.</span>
+              <span className="small dim">Industry, owner titles, cities or ZIPs, company size. The agent searches Google Maps and the web for matches.</span>
             </button>
             <button className="start-card" onClick={() => ask('I have a CSV of leads to import. ')}>
               <span className="num mono">03</span>
