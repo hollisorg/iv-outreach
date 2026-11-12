@@ -1,21 +1,39 @@
 {
-  "name": "fitscout",
-  "productName": "Fitscout",
-  "version": "0.1.0",
-  "description": "Desktop lead finder: describe your ideal customer, Claude finds and researches matching businesses, drafts personal outreach for your approval, and ranks who replies.",
-  "author": "The Hollis Organization",
-  "license": "UNLICENSED",
-  "private": true,
-  "type": "module",
-  "engines": {
-    "node": ">=22.13"
-  },
-  "scripts": {
-    "test": "node --test --test-concurrency=1 \"test/*.test.mjs\"",
-    "mcp": "node src/mcp/server.js"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "1.32.1",
-    "zod": "3.25.76"
-  }
+    "name": "fitscout",
+    "productName": "Fitscout",
+    "version": "0.1.0",
+    "description": "Desktop lead finder: describe your ideal customer, Claude finds and researches matching businesses, drafts personal outreach for your approval, and ranks who replies.",
+    "author": "The Hollis Organization",
+    "license": "UNLICENSED",
+    "private": true,
+    "type": "module",
+    "engines": {
+        "node": ">=22.13"
+    },
+    "scripts": {
+        "dev": "electron-vite dev",
+        "build": "electron-vite build",
+        "start": "electron-vite preview",
+        "test": "node --test --test-concurrency=1 \"test/*.test.mjs\"",
+        "mcp": "node src/mcp/server.js",
+        "chat-smoke": "node scripts/chat-smoke.mjs"
+    },
+    "dependencies": {
+        "@modelcontextprotocol/sdk": "1.32.1",
+        "zod": "3.25.76"
+    },
+    "devDependencies": {
+        "@fontsource-variable/fraunces": "^5.3.0",
+        "@fontsource/ibm-plex-mono": "^5.3.0",
+        "@fontsource/ibm-plex-sans": "^5.3.0",
+        "@vitejs/plugin-react": "^6.1.2",
+        "electron": "^44.9.0",
+        "electron-builder": "^26.15.3",
+        "electron-vite": "^6.0.0",
+        "playwright": "^1.65.0",
+        "react": "^19.3.1",
+        "react-dom": "^19.3.1",
+        "vite": "^8.3.4"
+    },
+    "main": "./out/main/index.js"
 }
