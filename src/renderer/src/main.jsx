@@ -1,11 +1,18 @@
 import { createRoot } from 'react-dom/client'
-import '@fontsource-variable/fraunces'
-import '@fontsource/ibm-plex-sans/400.css'
-import '@fontsource/ibm-plex-sans/500.css'
-import '@fontsource/ibm-plex-sans/600.css'
-import '@fontsource/ibm-plex-mono/400.css'
-import '@fontsource/ibm-plex-mono/500.css'
 import './styles.css'
 import App from './App'
+import ChatWindow from './components/ChatWindow'
 
-createRoot(document.getElementById('root')).render(<App />)
+// Keep the reused font notices in the packaged renderer alongside their font files.
+for (const href of [
+  new URL('./assets/licenses/Barlow-Condensed-OFL.txt', import.meta.url).href,
+  new URL('./assets/licenses/DM-Sans-OFL.txt', import.meta.url).href,
+  new URL('./assets/licenses/JetBrains-Mono-OFL.txt', import.meta.url).href,
+]) {
+  const notice = document.createElement('link')
+  notice.rel = 'license'
+  notice.href = href
+  document.head.appendChild(notice)
+}
+
+createRoot(document.getElementById('root')).render(new URLSearchParams(location.search).has('chatWindow') ? <ChatWindow /> : <App />)

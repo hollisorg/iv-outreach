@@ -1,12 +1,12 @@
 // Leads: add (with dedupe), list, read, fit scoring, CSV import/export.
-import { readFileSync } from 'node:fs'
 import { now, newId, tx, logEvent } from './db.js'
 import { normEmail, normUrl, domainOf, normLinkedin, clip } from './normalize.js'
 import { isSuppressed } from './suppression.js'
 import { parseCsv, toCsv } from './csv.js'
 import { recomputeLead } from './scoring.js'
+import { readLeadCsv, isOpenOutreachCsv, parseOpenOutreachCsv, OPENOUTREACH_COLUMNS } from './openoutreach.js'
 
-const SOURCES = new Set(['manual', 'claude_research', 'csv', 'google_maps', 'website', 'referral'])
+const SOURCES = new Set(['manual', 'claude_research', 'csv', 'google_maps', 'website', 'referral', 'openoutreach'])
 
 // Common export headers (Sales Navigator, Apollo, Google Maps scrapers, hand-made sheets).
 const CSV_ALIASES = {
@@ -17,7 +17,7 @@ const CSV_ALIASES = {
   company: ['company', 'company name', 'organization', 'business', 'business name', 'account name'],
   website: ['website', 'company website', 'url', 'web', 'domain'],
   email: ['email', 'email address', 'work email', 'e-mail', 'emails'],
-  linkedin_url: ['linkedin', 'linkedin url', 'person linkedin url', 'linkedin profile', 'profile url'],
+  linkedin_url: ['linkedin', 'linkedin_url', 'linkedin url', 'person linkedin url', 'linkedin profile', 'profile url'],
   phone: ['phone', 'phone number', 'mobile', 'work phone'],
   location: ['location', 'city', 'address', 'complete_address', 'region'],
   notes: ['notes', 'note', 'description', 'category'],
@@ -69,17 +69,51 @@ function findDuplicate(db, campaignId, lead) {
   return null
 }
 
-export function addLeads(db, campaignId, inputs) {
+export function addLeads(db, campaignId, inputs, { openoutreach = false } = {}) {
   if (!db.prepare('select 1 from campaigns where id = ?').get(campaignId)) throw new Error(`No campaign ${campaignId}`)
-  const result = { added: [], duplicates: 0, suppressed: 0, invalid: 0 }
+  const result = { added: [], duplicates: 0, suppressed: 0, invalid: 0, updated: 0, conflicts: 0 }
   tx(db, () => {
     for (const input of inputs) {
       const lead = cleanLead(input)
+      const origin = openoutreach ? input._openoutreach : null
       if (!lead.name && !lead.company && !lead.email && !lead.linkedin_url && !lead.website) {
         result.invalid++
         continue
       }
-      if (findDuplicate(db, campaignId, lead)) { result.duplicates++; continue }
+      const prior = origin && db.prepare("select lead_id from lead_sources where campaign_id = ? and provider = 'openoutreach' and external_id = ?").get(campaignId, origin.external_id)
+      const duplicate = prior?.lead_id || findDuplicate(db, campaignId, lead)
+      if (duplicate) {
+        result.duplicates++
+        if (origin) {
+          const current = db.prepare('select * from leads where id = ?').get(duplicate)
+          // Never merge two different contacts or overwrite a corrected address/profile.
+          const collision = ['email', 'linkedin_url'].some((key) => lead[key] && (
+            (current[key] && current[key] !== lead[key]) ||
+            db.prepare(`select id from leads where campaign_id = ? and ${key} = ? and id != ?`).get(campaignId, lead[key], duplicate)
+          ))
+          if (collision) { result.conflicts++; continue }
+          const next = { ...current }
+          for (const key of ['name', 'title', 'company', 'website', 'domain', 'linkedin_url']) {
+            if (!next[key] && lead[key]) next[key] = lead[key]
+          }
+          if (!next.email && next.email_status === 'none' && lead.email) {
+            next.email = lead.email
+            next.email_status = 'provided'
+          }
+          const blocked = isSuppressed(db, next)
+          if (blocked) {
+            next.status = 'suppressed'
+            result.suppressed++
+            db.prepare("update messages set status = 'cancelled', updated_at = ? where lead_id = ? and status in ('draft','approved')").run(now(), duplicate)
+          }
+          const keys = ['name', 'title', 'company', 'website', 'domain', 'email', 'email_status', 'linkedin_url', 'status']
+          const changed = keys.some((key) => next[key] !== current[key])
+          if (changed) db.prepare(`update leads set ${keys.map((key) => `${key} = ?`).join(', ')}, updated_at = ? where id = ?`).run(...keys.map((key) => next[key]), now(), duplicate)
+          const sourceChanged = saveOrigin(db, campaignId, duplicate, origin)
+          if (changed || sourceChanged) result.updated++
+        }
+        continue
+      }
       const id = newId()
       const t = now()
       const blocked = isSuppressed(db, lead)
@@ -91,13 +125,45 @@ export function addLeads(db, campaignId, inputs) {
           lead.notes, blocked ? 'suppressed' : 'new', t, t)
       if (blocked) result.suppressed++
       result.added.push(id)
+      if (origin) saveOrigin(db, campaignId, id, origin)
     }
   })
   return result
 }
 
+function saveOrigin(db, campaignId, leadId, origin) {
+  const reason = clip(origin.reason || null, 10000)
+  const qualified = clip(origin.qualified_at || null, 100)
+  const old = db.prepare("select reason, qualified_at from lead_sources where campaign_id = ? and provider = 'openoutreach' and external_id = ?").get(campaignId, origin.external_id)
+  if (old && old.reason === reason && old.qualified_at === qualified) return false
+  db.prepare(`insert into lead_sources (campaign_id, provider, external_id, lead_id, reason, qualified_at)
+    values (?, 'openoutreach', ?, ?, ?, ?) on conflict(campaign_id, provider, external_id)
+    do update set reason = excluded.reason, qualified_at = excluded.qualified_at`)
+    .run(campaignId, origin.external_id, leadId, reason, qualified)
+  return true
+}
+
+export function importOpenOutreachCsv(db, campaignId, path) {
+  const inputs = parseOpenOutreachCsv(readLeadCsv(path))
+  return { source: 'openoutreach', rows: inputs.length, ...addLeads(db, campaignId, inputs, { openoutreach: true }) }
+}
+
+export function importOpenOutreachRecords(db, campaignId, records, namespace) {
+  const rows = records.map((record) => {
+    if (!record || !['string', 'number'].includes(typeof record.lead_id)) throw new Error('OpenOutreach returned a lead without its source ID.')
+    return { ...record, lead_id: `runtime:${namespace}:${record.lead_id}` }
+  })
+  const inputs = parseOpenOutreachCsv(toCsv(rows, [...OPENOUTREACH_COLUMNS, 'full_name']))
+  return addLeads(db, campaignId, inputs, { openoutreach: true })
+}
+
 export function importCsv(db, campaignId, path) {
-  const rows = parseCsv(readFileSync(path, 'utf8'))
+  const text = readLeadCsv(path)
+  if (isOpenOutreachCsv(text)) {
+    const inputs = parseOpenOutreachCsv(text)
+    return { source: 'openoutreach', rows: inputs.length, ...addLeads(db, campaignId, inputs, { openoutreach: true }) }
+  }
+  const rows = parseCsv(text)
   const inputs = rows.map((row) => {
     const first = pick(row, 'first')
     const last = pick(row, 'last')
@@ -126,6 +192,9 @@ function hydrate(row) {
 export function getLead(db, id) {
   const lead = hydrate(db.prepare('select * from leads where id = ?').get(id))
   if (!lead) return null
+  lead.sources = db.prepare('select provider, external_id, reason, qualified_at from lead_sources where lead_id = ?').all(id)
+  const research = db.prepare('select research_json from lead_research where lead_id = ?').get(id)
+  lead.research = research ? JSON.parse(research.research_json) : null
   lead.messages = db.prepare('select id, channel, step, subject, body, status, sent_at, error from messages where lead_id = ? order by created_at').all(id)
   lead.replies = db.prepare('select id, channel, received_at, text, sentiment, intent from replies where lead_id = ? order by received_at').all(id)
   return lead

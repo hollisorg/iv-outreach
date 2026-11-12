@@ -1,7 +1,9 @@
+import PageStage from '../components/PageStage'
+import { useState } from 'react'
 import { askAgent, when, STATUS } from '../api'
-import hero from '../assets/welcome-hero.webp'
 
 export default function Today({ campaign, overview, go, openChat }) {
+  const [search, setSearch] = useState('')
   if (!overview) return <div className="page"><p className="dim">Loading…</p></div>
   const c = overview.campaigns.find((x) => x.id === campaign?.id)
   const hour = new Date().getHours()
@@ -10,9 +12,16 @@ export default function Today({ campaign, overview, go, openChat }) {
 
   return (
     <div className="page today">
+      <PageStage kind="today" title="Who's next?" kicker="Infinite Variance / Outreach" subtitle="Find the right people. Start a real conversation.">
+          <form className="outreach-search" onSubmit={(e) => { e.preventDefault(); if (search.trim()) ask(`Find leads ${c ? 'for this campaign' : 'and build a campaign'}: ${search.trim()}`) }}>
+            <input aria-label="Who do you want to reach?" placeholder="Who do you want to reach?" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <button className="btn btn-primary" disabled={!search.trim()}>Find leads</button>
+          </form>
+          <button className="hero-chat-link mono" onClick={() => ask(c ? 'Find 10 leads that fit this campaign.' : 'Help me describe my ideal customer and find leads using public sources and my agent.')}>Let the chat help me choose <span aria-hidden="true">↗</span></button>
+      </PageStage>
       <header className="page-head">
         <p className="eyebrow">{new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</p>
-        <h1>{greet}.</h1>
+        <h2 className="dashboard-greeting">{greet}.</h2>
         <p className="lede">
           {c
             ? `${c.name}: ${c.leads} lead${c.leads === 1 ? '' : 's'} found, ${c.contacted} contacted, ${c.replied} replied.`
@@ -32,13 +41,6 @@ export default function Today({ campaign, overview, go, openChat }) {
 
       {!c ? (
         <section className="start">
-          <div className="hero" style={{ backgroundImage: `url(${hero})` }}>
-            <div className="hero-copy">
-              <p className="eyebrow">Fitscout</p>
-              <h2>Find the businesses that fit. Reach the ones who answer.</h2>
-              <p className="small">Google Maps listings, web research and your own lists, scored for fit, written to by hand, and ranked by who replies.</p>
-            </div>
-          </div>
           <h2>Three ways to start</h2>
           <div className="start-grid">
             <button className="start-card" onClick={() => ask('Build me a campaign from this franchise website: ')}>
@@ -65,6 +67,14 @@ export default function Today({ campaign, overview, go, openChat }) {
             <Tile n={c.drafts_waiting} label="Drafts to approve" hot={c.drafts_waiting > 0} onClick={() => go('approve')} />
             <Tile n={c.contacted} label="Contacted" onClick={() => go('leads')} />
             <Tile n={c.replied} label="Replied" hot={c.replied > 0} onClick={() => go('leads')} />
+          </section>
+
+          <section className="daily-paths" aria-label="Your outreach workflow">
+            {[
+              ['scanning', '01 / Discover', 'Find your people', 'Explore a market with your agent.', 'discovery'],
+              ['approve', '02 / Review', 'Make it personal', 'Read every draft. Give the final OK.', 'approval'],
+              ['social', '03 / Connect', 'Start a conversation', 'Your approved notes, ready for you.', 'conversation'],
+            ].map(([page, step, title, about, art]) => <button key={page} className={`daily-path path-${art}`} onClick={() => go(page)}><span className="eyebrow">{step}</span><strong>{title}</strong><span>{about}</span><i aria-hidden="true">↗</i></button>)}
           </section>
 
           <section className="panel">

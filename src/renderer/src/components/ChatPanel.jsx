@@ -4,7 +4,7 @@ import { AgentRows, useAgentSetup } from './AgentSetup'
 import { chatLines } from '../chatText'
 
 // The chat with the person's own Claude Code, Codex or Hermes (ported from IV Studio's ChatPanel): a panel down the
-// right side. Every Fitscout tool plus web research; approving outreach, cancelling messages or changing the sender
+// right side. Every IV Outreach tool plus web research; approving outreach, cancelling messages or changing the sender
 // profile shows an Allow card first.
 const NAMES = { claude: 'Claude Code', codex: 'Codex', hermes: 'Hermes' }
 const PLAN = { claude: 'Claude', codex: 'ChatGPT', hermes: 'Hermes' }
@@ -13,14 +13,16 @@ const timeOf = (at) => (at ? new Date(at).toLocaleTimeString(undefined, { hour: 
 
 const IDEAS = {
   today: [
+    'Research and save 5 sourced prospects for this campaign',
     'Build me a campaign from a franchise website',
     'Search Google Maps for HVAC contractors around Dublin, Ohio and score them',
     'What should I do next?',
   ],
-  leads: ['Research the leads that haven’t been looked at yet', 'Score fit for every lead without a score', 'Who should I call first, and why?'],
+  leads: ['Research and save 5 more sourced prospects for this campaign', 'Research the leads that haven’t been looked at yet', 'Who should I call first, and why?'],
+  scanning: ['Help me choose a market for this campaign', 'Show my saved scans and suggest the next search', 'Research five new prospects using free public sources'],
   approve: ['Draft a first email for every researched lead', 'Make these drafts shorter and warmer', 'Write LinkedIn connection notes for leads with a profile'],
   social: ['Find socials for my top 10 leads and write Instagram or Facebook DMs', 'Write LinkedIn notes for my top 10 leads by fit'],
-  settings: ['Help me finish my sender profile', 'What does Fitscout need from me before I can send?'],
+  settings: ['Help me finish my sender profile', 'What does IV Outreach need from me before I can send?'],
 }
 
 function useChat() {
@@ -72,6 +74,7 @@ function Entry({ e, onAnswer, agentName, first }) {
               {e.files.map((f) => <span key={f.path} className="file-chip">{f.name}</span>)}
             </div>
           )}
+          <span className="chat-name mono">You</span>
           <span className="chat-text">{e.text}</span>
           {e.at && <span className="chat-time mono">{timeOf(e.at)}</span>}
         </div>
@@ -80,6 +83,7 @@ function Entry({ e, onAnswer, agentName, first }) {
   if (e.kind === 'agent')
     return (
       <div className="chat-row agent">
+        <span className="message-avatar" aria-hidden="true">IV</span>
         <div className="bubble agent">
           {first && <span className="chat-name mono">{agentName}</span>}
           <ChatText text={e.text} />
@@ -92,7 +96,7 @@ function Entry({ e, onAnswer, agentName, first }) {
   if (e.kind === 'step')
     return (
       <div className={`chat-step mono small ${e.error ? 'err' : ''}`} title={e.error || undefined}>
-        <span aria-hidden="true">{e.error ? '!' : '✓'}</span> {e.label}
+        <span aria-hidden="true">{e.error ? '!' : '✓'}</span> {({ fitscout_inspect_app: 'Looked at your Outreach screen', fitscout_list_places: 'Found the right place', fitscout_show_in_app: 'Showed you where to go' })[e.tool?.split('__').pop()] || e.label}
         {e.count > 1 && <span className="dim"> ×{e.count}</span>}
         {e.error && <span className="chat-step-why">{e.error}</span>}
       </div>
@@ -140,7 +144,7 @@ function ContextMeter({ usage, engine }) {
       {open && (
         <div className="chat-usage small" role="note">
           <p>This chat: {tokens(usage.input)} tokens read ({tokens(usage.cached)} from cache), {tokens(usage.output)} written, over {usage.turns} {usage.turns === 1 ? 'turn' : 'turns'}.</p>
-          <p className="dim">{engine === 'hermes' ? 'It runs on the model you picked in Hermes.' : `It runs on your ${PLAN[engine]} plan; you aren’t charged per token.`}</p>
+          <p className="dim">{engine === 'hermes' ? 'It runs on the model you picked in Hermes.' : `Uses your signed-in ${PLAN[engine]} account. Your plan limits and any extra-usage settings apply.`}</p>
         </div>
       )}
     </>
@@ -154,13 +158,23 @@ function when(at) {
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' })
 }
 
-export default function ChatPanel({ onClose, context, page, notify }) {
+export default function ChatPanel({ onClose, onPopOut, detached = false, context, page, notify }) {
   const [status, reload] = useChat()
   const setup = useAgentSetup()
-  const [tab, setTab] = useState('chat')
-  const [text, setText] = useState('')
-  const [files, setFiles] = useState([])
-  const [engine, setEngine] = useState(null)
+  const [draft, setDraft] = useState({ tab: 'chat', text: '', files: [], engine: null })
+  const [draftReady, setDraftReady] = useState(false)
+  const { tab, text, files, engine } = draft
+  const changeDraft = (patch) => { setDraft(d => ({...d,...patch})); call('chatSetComposer', patch).catch(e => notify?.(e.message)) }
+  const setTab = tab => changeDraft({tab})
+  const setText = text => changeDraft({text})
+  const setFiles = value => changeDraft({files: typeof value === 'function' ? value(files) : value})
+  const setEngine = engine => changeDraft({engine})
+  useEffect(() => {
+    let live = true
+    const off = on('chat:composer', d => { if (live) { setDraft(d); setDraftReady(true) } })
+    call('chatComposer').then(d => { if (live) { setDraft(d); setDraftReady(true) } }, e => notify?.(e.message))
+    return () => { live = false; off() }
+  }, [])
   const [dropping, setDropping] = useState(false)
   const bodyRef = useRef(null)
   const inputRef = useRef(null)
@@ -198,24 +212,9 @@ export default function ChatPanel({ onClose, context, page, notify }) {
   const send = act(async (words) => {
     const t = (words ?? text).trim()
     if ((!t && !files.length) || busy) return
-    setText('')
     const withFiles = files
-    setFiles([])
     await call('chatSend', { text: t, context, engine: pick, files: withFiles })
   })
-  // a question handed over from elsewhere in the app
-  useEffect(() => {
-    const onAsk = (ev) => {
-      setTab('chat')
-      if (ev.detail.send && !busy) send(ev.detail.text)
-      else {
-        setText(ev.detail.text || '')
-        inputRef.current?.focus()
-      }
-    }
-    window.addEventListener('fs:ask', onAsk)
-    return () => window.removeEventListener('fs:ask', onAsk)
-  }, [busy, pick, context])
   const addFiles = (paths) => {
     const ok = (paths || []).filter((p) => /\.(csv|txt|md)$/i.test(p))
     if (ok.length < (paths || []).length) notify?.('Only CSV files of leads and text notes can go in the chat.')
@@ -250,6 +249,7 @@ export default function ChatPanel({ onClose, context, page, notify }) {
       }}
     >
       <header className="chat-head">
+        <span className="chat-avatar" aria-hidden="true">IV</span>
         <div className="chat-tabs" role="tablist" aria-label="Chat or history">
           <button role="tab" aria-selected={tab === 'chat'} className={tab === 'chat' ? 'on' : ''} onClick={() => setTab('chat')}>Chat</button>
           <button role="tab" aria-selected={tab === 'history'} className={tab === 'history' ? 'on' : ''} onClick={() => setTab('history')}>History</button>
@@ -258,6 +258,9 @@ export default function ChatPanel({ onClose, context, page, notify }) {
         {chat?.entries?.length > 0 && tab === 'chat' && (
           <button className="btn btn-small" disabled={busy} onClick={() => fresh()}>New</button>
         )}
+        <button className="icon-btn chat-pop" aria-label={detached ? 'Dock chat' : 'Pop out chat'} title={detached ? 'Return chat to the app' : 'Open chat in its own window'} onClick={onPopOut}>
+          <svg viewBox="0 0 24 24" aria-hidden="true">{detached ? <><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M14 4v16M7 12h4m-2-2 2 2-2 2"/></> : <><path d="M14 4h6v6M20 4l-9 9M10 5H4v15h15v-6"/></>}</svg>
+        </button>
         <button className="icon-btn" aria-label="Close the chat" title="Close the chat" onClick={onClose}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
         </button>
@@ -280,7 +283,7 @@ export default function ChatPanel({ onClose, context, page, notify }) {
       ) : !pick ? (
         <div className="chat-body chat-setup">
           <h3 className="chat-setup-title">Chat with your own agent</h3>
-          <p className="small">Fitscout’s chat runs on your own Claude Code, Codex or Hermes, on your own plan. Install one here, or sign in if you already have it.</p>
+          <p className="small">IV Outreach’s chat runs on your own Claude Code, Codex or Hermes, on your own plan. Install one here, or sign in if you already have it.</p>
           <AgentRows setup={setup} notify={notify} />
         </div>
       ) : (
@@ -337,6 +340,7 @@ export default function ChatPanel({ onClose, context, page, notify }) {
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5l-7.8 7.8a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8" /></svg>
               </button>
               <textarea
+                disabled={!draftReady}
                 ref={inputRef}
                 rows={1}
                 value={text}

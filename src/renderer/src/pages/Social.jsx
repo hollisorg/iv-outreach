@@ -1,14 +1,16 @@
+import PageStage from '../components/PageStage'
 import { useEffect, useState } from 'react'
 import { call, useData } from '../api'
-import emptyArt from '../assets/empty-social.webp'
+import emptyArt from '../assets/outreach-conversation-v1.png'
 
 const NAMES = { linkedin: 'LinkedIn', facebook: 'Facebook', instagram: 'Instagram', x: 'X', tiktok: 'TikTok' }
 
-export default function Social({ notify }) {
-  const [q, reload] = useData('socialQueue')
+export default function Social({ notify, business }) {
+  const [q, reload] = useData('socialQueue', {business_id: business?.id || '__none__'})
   const [filter, setFilter] = useState('all')
   const [current, setCurrent] = useState(0)
   const [opened, setOpened] = useState({})
+  useEffect(() => { setCurrent(0); setFilter('all'); setOpened({}) }, [business?.id])
   const items = (q?.items || []).filter((i) => filter === 'all' || i.channel === filter)
   const it = items[Math.min(current, Math.max(0, items.length - 1))]
 
@@ -48,14 +50,13 @@ export default function Social({ notify }) {
   const counts = Object.fromEntries(Object.keys(NAMES).map((ch) => [ch, (q?.items || []).filter((i) => i.channel === ch).length]))
   return (
     <div className="page social">
-      <header className="page-head">
-        <p className="eyebrow">Send list</p>
-        <h1>Social</h1>
-        <p className="lede">
-          LinkedIn, Facebook, Instagram, X and TikTok don’t allow automated messages, so you send these yourself, fast.
-          <span className="keys"> <kbd>O</kbd> copy the note and open the profile, <kbd>S</kbd> mark it sent, <kbd>J</kbd>/<kbd>K</kbd> next and back.</span>
-        </p>
-      </header>
+      <PageStage kind="social" title="Social" kicker="Infinite Variance / Human connections" subtitle="A real conversation starts with you." />
+      <div className="social-guide" aria-label="How social sending works">
+        <div><b>01</b><strong>Open a profile</strong><span>Copy your approved note.</span></div>
+        <div><b>02</b><strong>Make the connection</strong><span>Paste and send it yourself.</span></div>
+        <div><b>03</b><strong>Keep your place</strong><span>Mark it sent when you're done.</span></div>
+      </div>
+      <p className="social-keyboard small dim"><kbd>O</kbd> open · <kbd>S</kbd> mark sent · <kbd>J</kbd> / <kbd>K</kbd> move through notes</p>
 
       {q && (
         <div className="seg-row">

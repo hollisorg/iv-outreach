@@ -240,14 +240,14 @@ function followupDue(db, m, sender) {
   return Date.now() - Date.parse(prev.sent_at) >= sender.followup_days * 864e5
 }
 
-export function dueMessages(db, channel) {
+export function dueMessages(db, channel, { business_id } = {}) {
   const sender = getSender(db)
   const cap = channel === 'email' ? sender.daily_email_cap : channel === 'linkedin' ? sender.daily_linkedin_cap : sender.daily_social_cap
   const remaining = Math.max(0, cap - sentToday(db, channel))
   if (!remaining) return { remaining: 0, cap, messages: [] }
   const approved = db.prepare(`select m.*, l.name, l.company, l.email, l.linkedin_url, l.domain, l.socials_json
     from messages m join leads l on l.id = m.lead_id
-    where m.channel = ? and m.status = 'approved' order by m.step, m.approved_at`).all(channel)
+    where m.channel = ? and m.status = 'approved' ${business_id ? 'and m.campaign_id in (select id from campaigns where business_id=?)' : ''} order by m.step, m.approved_at`).all(channel, ...(business_id ? [business_id] : []))
   const due = []
   for (const m of approved) {
     if (due.length >= remaining) break
@@ -262,11 +262,11 @@ export function dueMessages(db, channel) {
 
 // The social send list: every approved LinkedIn, Facebook, Instagram, X and TikTok note due today, each with the
 // link that opens the profile or DM. The person sends each one themselves and marks it sent.
-export function socialQueue(db, { channel = null } = {}) {
+export function socialQueue(db, { channel = null, business_id } = {}) {
   const channels = channel ? [channel] : SOCIAL_CHANNELS
   const out = { how_it_works: 'Open each profile or DM, paste the note, and send it yourself. Then mark it sent here.', channels: {}, items: [] }
   for (const ch of channels) {
-    const { remaining, cap, messages } = dueMessages(db, ch)
+    const { remaining, cap, messages } = dueMessages(db, ch, {business_id})
     out.channels[ch] = { remaining_today: remaining, daily_cap: cap, sent_today: sentToday(db, ch) }
     for (const m of messages) {
       const target = socialTarget(m, ch)

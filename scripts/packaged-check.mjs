@@ -6,8 +6,9 @@ import { _electron as electron } from 'playwright'
 import { mkdtempSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import assert from 'node:assert/strict'
 
-const exe = resolve('dist/win-unpacked/Fitscout.exe')
+const exe = resolve('dist/win-unpacked/IV Outreach.exe')
 const script = resolve('dist/win-unpacked/resources/app.asar/out/main/mcp.js')
 const out = process.argv[2] || join(tmpdir(), 'fitscout-packaged')
 mkdirSync(out, { recursive: true })
@@ -21,8 +22,18 @@ const call = async (name, args = {}) => {
   if (r.isError) throw new Error(`${name}: ${r.content[0].text}`)
   return JSON.parse(r.content[0].text)
 }
-result.tools = (await client.listTools()).tools.length
-const c = await call('fitscout_create_campaign', { name: 'Packaged check (fictional)', offer: 'x', icp: {} })
+const tools = (await client.listTools()).tools
+result.tools = tools.length
+assert.ok(tools.some(t => t.name === 'fitscout_research_plan'))
+assert.ok(tools.some(t => t.name === 'fitscout_save_research'))
+assert.ok(!tools.some(t => t.name === 'fitscout_start_openoutreach'))
+const c = await call('fitscout_create_campaign', { name: 'Packaged check (fictional)', offer: 'Booking workflows', icp: { industries: ['Plumbing'], locations: ['Ohio'] } })
+const plan = await call('fitscout_research_plan', { campaign_id: c.id, count: 5 })
+assert.equal(plan.budget.provider_credits, 0)
+const fixture = await call('fitscout_add_leads', { campaign_id: c.id, leads: [{ company: 'Packaged fixture (fictional)', website: 'https://plumber.test', source: 'manual' }] })
+const research = await call('fitscout_save_research', { lead_id: fixture.lead_ids[0], fit_score: 70, fit_reason: 'Fixture category matches', evidence: [{ url: 'https://plumber.test', observation: 'Fictional plumbing fixture' }], opportunity: 'Discuss booking needs', unknowns: ['Budget'], confidence: 'low' })
+assert.equal(research.research.buying_intent, 'unconfirmed')
+result.nativeResearch = { plan: true, saved: true, providerCredits: 0 }
 if (process.argv.includes('--live')) {
   const maps = await call('fitscout_find_on_google_maps', { campaign_id: c.id, query: 'roofers in Delaware, Ohio', lat: 40.2987, lng: -83.068 })
   result.maps = { found: maps.found, added: maps.added }

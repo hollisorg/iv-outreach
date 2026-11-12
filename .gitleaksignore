@@ -1,0 +1,4 @@
+# Reviewed 2026-11-12: unchanged public Disqus client lookup URL distributed by
+# WebBreacher/WhatsMyName main/wmn-data.json; verified exact equality upstream.
+# This exception applies only to that historical dataset finding, not user credentials.
+7f4e7edaf5a29f9e84b6c16f7669bc12ee96834a:vendor/wmn/wmn-data.json:generic-api-key:1878

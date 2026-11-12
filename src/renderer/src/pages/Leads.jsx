@@ -1,6 +1,8 @@
+import PageStage, { PageMetrics } from '../components/PageStage'
 import { useEffect, useState } from 'react'
 import { call, useData, when, STATUS, askAgent } from '../api'
-import emptyArt from '../assets/empty-leads.webp'
+import emptyArt from '../assets/outreach-discovery-v1.png'
+import PaidResearch from '../components/PaidResearch'
 
 const SORTS = [
   ['rank', 'Call first'],
@@ -8,40 +10,10 @@ const SORTS = [
   ['newest', 'Newest'],
 ]
 
-function MapsSearch({ campaign, notify, onDone }) {
-  const [open, setOpen] = useState(false)
-  const [query, setQuery] = useState('')
-  const [near, setNear] = useState('')
-  const [busy, setBusy] = useState(false)
-  const run = async () => {
-    if (!query.trim()) return
-    setBusy(true)
-    try {
-      const r = await call('searchMaps', { campaign_id: campaign.id, query: near.trim() ? `${query.trim()} in ${near.trim()}` : query.trim(), near: near.trim() || undefined })
-      notify(r.found ? `Google Maps: ${r.found} businesses, ${r.added} new${r.duplicates ? `, ${r.duplicates} already here` : ''}.` : r.note || 'No listings came back.', r.found ? 'ok' : 'error')
-      onDone()
-      if (r.found) setOpen(false)
-    } catch (e) {
-      notify(e.message)
-    } finally {
-      setBusy(false)
-    }
-  }
-  if (!open) return <button className="btn btn-primary" onClick={() => setOpen(true)}>Find on Google Maps</button>
-  return (
-    <form className="maps-form" onSubmit={(e) => (e.preventDefault(), run())}>
-      <input autoFocus placeholder="What, e.g. HVAC contractors" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Business type" />
-      <input placeholder="Where, e.g. Dublin, Ohio" value={near} onChange={(e) => setNear(e.target.value)} aria-label="Place" />
-      <button className="btn btn-primary" disabled={busy || !query.trim()}>{busy ? 'Searching…' : 'Search'}</button>
-      <button type="button" className="btn btn-quiet" onClick={() => setOpen(false)}>Cancel</button>
-    </form>
-  )
-}
-
-export default function Leads({ campaign, leadId, setLeadId, notify, openChat }) {
+export default function Leads({ campaign, leadId, setLeadId, notify, openChat, go }) {
   const [sort, setSort] = useState('rank')
-  const [leads, reload] = useData('listLeads', { campaign_id: campaign?.id, sort, limit: 300 }, [campaign?.id, sort])
-  if (!campaign) return <div className="page"><h1>Leads</h1><p className="dim">No campaign yet. Ask in the chat to start one.</p></div>
+  const [leads, reload] = useData('listLeads', { campaign_id: campaign?.id || '__none__', sort, limit: 300 }, [campaign?.id, sort])
+  if (!campaign) return <div className="page leads"><PageStage kind="leads" title="Leads" kicker="Infinite Variance / Your opportunities" subtitle="Real businesses. A reason to connect." /><div className="empty"><h2>Your next connection starts here.</h2><p>Create a campaign with your agent to begin your lead collection.</p><button className="btn btn-primary" onClick={openChat}>Open my agent</button></div></div>
 
   const act = (fn) => async () => {
     try {
@@ -54,13 +26,11 @@ export default function Leads({ campaign, leadId, setLeadId, notify, openChat })
   }
   return (
     <div className={`page leads ${leadId ? 'with-drawer' : ''}`}>
-      <header className="page-head row">
-        <div>
-          <p className="eyebrow">{campaign.name}</p>
-          <h1>Leads</h1>
-        </div>
+      <PageStage kind="leads" title="Leads" kicker="Infinite Variance / Your opportunities" subtitle="Real businesses. A reason to connect." />
+      <div className="page-context"><p className="eyebrow">{campaign.name}</p><PageMetrics items={[[leads?.length ?? '—', 'In this view'], [leads?.filter(l => l.fit_score >= 70).length ?? '—', 'Fit 70+'], [leads?.filter(l => l.first_reply_at).length ?? '—', 'Have replied']]} /></div>
+      <div className="page-toolbar">
         <div className="head-actions">
-          <MapsSearch campaign={campaign} notify={notify} onDone={reload} />
+          <button className="btn btn-primary" onClick={() => go('scanning')}>Open Scanning ↗</button>
           <div className="segmented" role="radiogroup" aria-label="Sort">
             {SORTS.map(([id, label]) => (
               <button key={id} role="radio" aria-checked={sort === id} className={sort === id ? 'on' : ''} onClick={() => setSort(id)}>{label}</button>
@@ -68,14 +38,15 @@ export default function Leads({ campaign, leadId, setLeadId, notify, openChat })
           </div>
           <button className="btn" onClick={act(async () => {
             const r = await call('importCsv', { campaign_id: campaign.id })
-            if (r) notify(`Imported ${r.added} of ${r.rows} rows (${r.duplicates} already here, ${r.suppressed} on do-not-contact).`, 'ok')
+            if (r) notify(`Imported ${r.added} of ${r.rows} rows (${r.duplicates} already here, ${r.updated || 0} updated, ${r.suppressed} on do-not-contact, ${r.conflicts || 0} conflicts, ${r.invalid} invalid).`, r.conflicts || r.invalid ? 'error' : 'ok')
           })}>Import CSV</button>
           <button className="btn" onClick={act(async () => {
             const r = await call('exportCsv', { campaign_id: campaign.id })
             if (r) notify(`Saved ${r.written}`, 'ok')
           })}>Export</button>
         </div>
-      </header>
+      </div>
+
 
       {!leads ? (
         <p className="dim">Loading…</p>
@@ -84,7 +55,7 @@ export default function Leads({ campaign, leadId, setLeadId, notify, openChat })
           <img src={emptyArt} alt="" width="200" height="200" />
           <div>
             <p className="empty-title">No leads in this campaign yet.</p>
-            <p className="dim">Search Google Maps above, drop a CSV in, or let the agent research the web for you.</p>
+            <p className="dim">Open Scanning, import a CSV, or let your agent research the web for you.</p>
             <button className="btn" onClick={() => (openChat(), askAgent({ text: 'Find 15 real businesses that fit this campaign and add them.' }))}>Ask the agent to find some</button>
           </div>
         </div>
@@ -263,7 +234,26 @@ function LeadDrawer({ id, onClose, notify, onChanged }) {
         <div><dt>Website</dt><dd className="mono small">{lead.website || '–'}</dd></div>
         {lead.source_url && <div><dt>Found on</dt><dd className="mono small">{lead.source_url}</dd></div>}
       </dl>
+      {lead.research && <section className="research-evidence" aria-label="Research evidence">
+        <h3>Why this business fits</h3>
+        <p className="small dim">Agent research · {lead.research.confidence} confidence · {when(lead.research.checked_at)}. Buying intent unconfirmed.</p>
+        <h4>Observed on public sources</h4>
+        {lead.research.evidence.map((item, i) => <div className="msg-mini" key={i}>
+          <p className="small">{item.observation}</p><p className="mono small dim research-source">{item.url}</p>
+          <button className="btn btn-small" onClick={() => call('copyText', { text: item.url }).then(() => notify('Source URL copied.', 'ok')).catch(e=>notify(e.message))}>Copy source</button>
+        </div>)}
+        <h4>Potential opportunity</h4><p className="small">{lead.research.opportunity}</p>
+        {lead.research.unknowns.length > 0 && <><h4>Still unknown</h4><ul className="small">{lead.research.unknowns.map((item,i)=><li key={i}>{item}</li>)}</ul></>}
+      </section>}
+      {lead.sources?.map((source) => (
+        <section key={`${source.provider}:${source.external_id}`}>
+          <h3>Imported fit explanation</h3>
+          <p className="small">{source.reason || 'No explanation supplied.'}</p>
+          <p className="small dim">Source ID: {source.external_id}{source.qualified_at ? ` · Qualified ${source.qualified_at}` : ''}</p>
+        </section>
+      ))}
       <Socials lead={lead} notify={notify} onChanged={() => (reload(), onChanged())} />
+      <PaidResearch key={lead.id} lead={lead} notify={notify} onChanged={() => (reload(), onChanged())} />
       {lead.site_summary && (
         <section>
           <h3>From their site</h3>

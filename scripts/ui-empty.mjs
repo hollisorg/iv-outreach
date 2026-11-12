@@ -12,7 +12,7 @@ const win = await app.firstWindow()
 await win.setViewportSize({ width: 1440, height: 900 })
 const errors = []
 win.on('pageerror', (e) => errors.push(String(e)))
-await win.waitForSelector('.hero')
+await win.waitForSelector('.outreach-hero')
 await win.waitForTimeout(1200)
 await win.screenshot({ path: join(out, '0-welcome.png') })
 await win.click('.nav button:has-text("Leads")')

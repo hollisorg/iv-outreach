@@ -176,6 +176,45 @@ export const MIGRATIONS = [
     primary key (mailbox, uid)
   );
   `,
+  // 4: stable source identities and explanations for repeat OpenOutreach imports.
+  `
+  create table lead_sources (
+    campaign_id text not null references campaigns(id) on delete cascade,
+    provider text not null,
+    external_id text not null,
+    lead_id text not null references leads(id) on delete cascade,
+    reason text,
+    qualified_at text,
+    primary key (campaign_id, provider, external_id)
+  );
+  create index lead_sources_lead on lead_sources(lead_id);
+  `,
+  // 5: native agent research, separate observations from proposed opportunities and unknowns.
+  `
+  create table lead_research (
+    lead_id text primary key references leads(id) on delete cascade,
+    research_json text not null
+  );
+  `,
+  // 6: businesses own campaigns; existing campaign and lead IDs remain unchanged.
+  `
+  create table businesses (
+    id text primary key, name text not null, profile_json text not null default '{}',
+    created_at text not null, updated_at text not null
+  );
+  insert into businesses(id,name,profile_json,created_at,updated_at)
+    select 'legacy-business', coalesce(nullif((select json_extract(value,'$.profile.company') from settings where key='iv_onboarding_v1'),''),'My business'),
+    coalesce((select json_extract(value,'$.profile') from settings where key='iv_onboarding_v1'),'{}'),
+    strftime('%Y-%m-%dT%H:%M:%fZ','now'), strftime('%Y-%m-%dT%H:%M:%fZ','now')
+    where exists(select 1 from campaigns);
+  alter table campaigns add column business_id text references businesses(id);
+  update campaigns set business_id='legacy-business';
+  create index campaigns_business on campaigns(business_id);
+  create trigger campaigns_business_insert before insert on campaigns when new.business_id is null
+    begin select raise(abort,'A campaign needs a business'); end;
+  create trigger campaigns_business_update before update of business_id on campaigns when new.business_id is null
+    begin select raise(abort,'A campaign needs a business'); end;
+  `,
 ]
 
 export function openDb(file) {

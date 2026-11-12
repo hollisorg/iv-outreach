@@ -16,6 +16,8 @@ test('approving, cancelling and changing the sender profile need an Allow; readi
   assert.ok(chatAsk('fitscout_cancel_messages', { message_ids: ['a'] }))
   assert.ok(chatAsk('fitscout_sender_profile', { daily_email_cap: 70 }))
   assert.equal(chatAsk('fitscout_sender_profile', {}), null, 'reading the profile is free')
+  assert.equal(chatAsk('fitscout_research_plan', { count: 5 }), null)
+  assert.equal(chatAsk('fitscout_save_research', { lead_id: 'local-research' }), null)
   for (const t of ['fitscout_overview', 'fitscout_add_leads', 'fitscout_save_drafts', 'fitscout_list_leads']) assert.equal(chatAsk(t, {}), null)
 })
 
@@ -63,7 +65,7 @@ test('folds events into a chat: repeated searches collapse, asks get answered', 
 })
 
 test('context line and CSV attachments', () => {
-  assert.equal(contextLine({ page: 'leads', campaignId: 'c1', campaignName: 'Plumbers' }), '[Fitscout is showing Leads; campaign "Plumbers" id c1]')
+  assert.equal(contextLine({ page: 'leads', campaignId: 'c1', campaignName: 'Plumbers' }), '[IV Outreach is showing Leads; campaign "Plumbers" id c1]')
   const m = withAttachments('Import these', ['C:\\x\\leads.csv', 'C:\\x\\photo.png'])
   assert.match(m, /CSV of leads: C:\\x\\leads\.csv/)
   assert.doesNotMatch(m, /photo/)

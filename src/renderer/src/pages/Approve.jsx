@@ -1,14 +1,15 @@
+import PageStage, { PageMetrics } from '../components/PageStage'
 import { useEffect, useState } from 'react'
 import { call, useData, askAgent } from '../api'
-import emptyArt from '../assets/empty-approve.webp'
+import emptyArt from '../assets/outreach-approval-v1.png'
 
 const CH = { email: 'Email', linkedin: 'LinkedIn', facebook: 'Facebook', instagram: 'Instagram', x: 'X', tiktok: 'TikTok' }
 const LIMIT = { facebook: 2000, instagram: 1000, x: 10000, tiktok: 500 }
 
 export default function Approve({ campaign, overview, notify, go, openChat }) {
-  const [drafts, reload] = useData('listMessages', { campaign_id: campaign?.id, status: 'draft' }, [campaign?.id])
-  const [approved] = useData('listMessages', { campaign_id: campaign?.id, status: 'approved' }, [campaign?.id])
-  if (!campaign) return <div className="page"><h1>Approve</h1><p className="dim">No campaign yet.</p></div>
+  const [drafts, reload] = useData('listMessages', { campaign_id: campaign?.id || '__none__', status: 'draft' }, [campaign?.id])
+  const [approved] = useData('listMessages', { campaign_id: campaign?.id || '__none__', status: 'approved' }, [campaign?.id])
+  if (!campaign) return <div className="page approve"><PageStage kind="approve" title="Approve" kicker="Infinite Variance / The final say" subtitle="Thoughtful outreach starts with your OK." /><div className="empty"><h2>Your voice. Your approval.</h2><p>Create a campaign, then ask your agent to prepare drafts.</p><button className="btn btn-primary" onClick={openChat}>Open my agent</button></div></div>
   const clean = (drafts || []).filter((d) => !d.issues.some((i) => i.level === 'block'))
   const approve = async (ids) => {
     try {
@@ -23,16 +24,13 @@ export default function Approve({ campaign, overview, notify, go, openChat }) {
   }
   return (
     <div className="page approve">
-      <header className="page-head row">
-        <div>
-          <p className="eyebrow">{campaign.name}</p>
-          <h1>Approve</h1>
-          <p className="lede">Nothing goes out until you approve it. {approved?.length ? `${approved.length} approved and waiting to send.` : ''}</p>
-        </div>
+      <PageStage kind="approve" title="Approve" kicker="Infinite Variance / The final say" subtitle="Thoughtful outreach starts with your OK." />
+      <div className="page-context"><p className="eyebrow">{campaign.name}</p><PageMetrics items={[[drafts?.length ?? '—', 'To review'], [clean.length, 'No blocking issues'], [approved?.length ?? '—', 'Approved / waiting']]} /></div>
+      <div className="page-toolbar"><p className="small dim">Review the words, check the details, then approve.</p>
         <div className="head-actions">
           {clean.length > 1 && <button className="btn btn-primary" onClick={() => approve(clean.map((d) => d.id))}>Approve {clean.length} with no issues</button>}
         </div>
-      </header>
+      </div>
 
       {overview && !overview.sender_ready && (
         <div className="banner">

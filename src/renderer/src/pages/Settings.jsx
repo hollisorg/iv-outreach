@@ -1,6 +1,11 @@
+import PageStage from '../components/PageStage'
+import BusinessSettings from '../components/BusinessSettings'
 import { useEffect, useState } from 'react'
 import { call, useData } from '../api'
 import { AgentRows, useAgentSetup } from '../components/AgentSetup'
+import ResearchSettings from '../components/ResearchSettings'
+import PremiumSettings from '../components/PremiumSettings'
+import AppUpdates from '../components/AppUpdates'
 
 const FIELDS = [
   ['name', 'Your name'],
@@ -11,20 +16,53 @@ const FIELDS = [
   ['signature', 'Signature (optional)'],
 ]
 
-export default function Settings({ notify }) {
-  return (
-    <div className="page settings">
-      <header className="page-head">
-        <p className="eyebrow">Settings</p>
-        <h1>Set up Fitscout</h1>
-      </header>
-      <Agent notify={notify} />
-      <Sender notify={notify} />
-      <Mailbox notify={notify} />
-      <Connect notify={notify} />
-      <DoNotContact notify={notify} />
+const TOPICS = [
+  ['updates', 'App updates', 'New versions, ready when you are.'],
+  ['businesses', 'Businesses', 'Brands, audiences and campaigns.'],
+  ['agent', 'Your agent', 'Your personal agent connection, shared across businesses.'],
+  ['research', 'Research', 'Choose how you discover and understand opportunities.'],
+  ['premium', 'Premium & credits', 'Your Premium account and credits are shared across this workspace.'],
+  ['sender', 'Sender profile', 'Shared across all businesses. Check the sender before approving outreach for a different brand.'],
+  ['mailbox', 'Mailbox', 'One connected mailbox on this PC, shared across businesses.'],
+  ['connections', 'Other apps', 'Use this workspace with your other agents.'],
+  ['boundaries', 'Do not contact', 'One suppression list protects contacts across every business.'],
+]
+export default function Settings({ notify, openOnboarding, ...workspace }) {
+  const [active, setActive] = useState('businesses')
+  useEffect(() => {
+    const main = document.querySelector('main')
+    const sync = () => {
+      const line = main.getBoundingClientRect().top + Math.min(220, main.clientHeight * .3)
+      let current = TOPICS[0][0]
+      for (const [id] of TOPICS) if (document.getElementById(`setup-${id}`)?.getBoundingClientRect().top <= line) current = id
+      if (main.scrollTop + main.clientHeight >= main.scrollHeight - 4) current = TOPICS.at(-1)[0]
+      setActive(current)
+    }
+    main.addEventListener('scroll', sync, { passive: true }); sync()
+    return () => main.removeEventListener('scroll', sync)
+  }, [])
+  const sections = {
+    updates: <AppUpdates notify={notify} />,
+    businesses: <BusinessSettings {...workspace} notify={notify} />,
+    agent: <Agent notify={notify} />, research: <ResearchSettings />,
+    premium: <PremiumSettings notify={notify} />, sender: <Sender notify={notify} />,
+    mailbox: <Mailbox notify={notify} />, connections: <Connect notify={notify} />,
+    boundaries: <DoNotContact notify={notify} />,
+  }
+  return <div className="page settings">
+    <PageStage kind="settings" title="Your setup" kicker="Infinite Variance / Make it yours" subtitle="Your businesses. Your agent. Your way." />
+    <div className="setup-reopen"><span className="small dim">{workspace.business?.name || 'Your workspace'} / Settings</span><button className="btn" onClick={openOnboarding}>Open guided setup ↗</button></div>
+    <div className="iv-set-layout">
+      <nav className="iv-set-nav" aria-label="Settings sections">{TOPICS.map(([id, title], i) => <button key={id} className={active === id ? 'on' : ''} aria-current={active === id ? 'location' : undefined} onClick={() => {
+        const el = document.getElementById(`setup-${id}`)
+        el?.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' }); el?.focus({ preventScroll: true }); setActive(id)
+      }}><span className="mono">{String(i+1).padStart(2,'0')}</span>{title}</button>)}</nav>
+      <div className="iv-set-cards">{TOPICS.map(([id,title,sub],i) => <section key={id} id={`setup-${id}`} className="iv-set-card" tabIndex={-1} aria-labelledby={`setup-title-${id}`}>
+        <header className="iv-set-card-head"><span className="iv-set-number" aria-hidden="true">{String(i+1).padStart(2,'0')}</span><div><h2 id={`setup-title-${id}`}>{title}</h2><p className="small dim">{sub}</p></div></header>
+        <div className="iv-set-body">{sections[id]}</div>
+      </section>)}</div>
     </div>
-  )
+  </div>
 }
 
 function Agent({ notify }) {
@@ -44,9 +82,10 @@ function Agent({ notify }) {
     <section className="panel set">
       <div className="set-head">
         <h2>Your agent</h2>
-        <p className="small dim">The chat runs on your own Claude Code, Codex or Hermes, on your own plan. Fitscout never needs an API key.</p>
+        <p className="small dim">The chat runs on your own Claude Code, Codex or Hermes, on your own plan. Your agent researches public sources and saves leads here. No separate research engine or API key is required.</p>
       </div>
       <AgentRows setup={setup} notify={notify} />
+      {s&&<div className="visual-guidance-setting"><label><input type="checkbox" checked={s.visualGuidanceEnabled!==false} onChange={e=>save({visualGuidanceEnabled:e.target.checked})}/><span>Let my chat agent see the Outreach screen</span></label><p className="small dim">When you ask for help, your agent can inspect this app and highlight where to go. Screenshots cover input fields and chat. Other apps are never captured.</p></div>}
       {s && (
         <div className="form-grid two">
           <label>
@@ -169,7 +208,7 @@ function Mailbox({ notify }) {
     <section className="panel set">
       <div className="set-head">
         <h2>Your mailbox</h2>
-        <p className="small dim">Email goes out from your own mailbox, one at a time at a human pace, while Fitscout is open. Replies are read back every few minutes: they rank the lead, stop follow-ups, and anyone who says “stop” goes on do-not-contact. Your password is encrypted by Windows and never leaves this PC.</p>
+        <p className="small dim">Email goes out from your own mailbox, one at a time at a human pace, while IV Outreach is open. Replies are read back every few minutes: they rank the lead, stop follow-ups, and anyone who says “stop” goes on do-not-contact. Your password is encrypted by Windows and never leaves this PC.</p>
       </div>
       <div className="form-grid two">
         <label>
@@ -236,8 +275,8 @@ function Connect({ notify }) {
   return (
     <section className="panel set">
       <div className="set-head">
-        <h2>Use Fitscout from your other apps</h2>
-        <p className="small dim">The same tools work in Claude Code, Codex and Claude Desktop, on this PC’s Fitscout data.</p>
+        <h2>Use IV Outreach from your other apps</h2>
+        <p className="small dim">The same tools work in Claude Code, Codex and Claude Desktop, on this PC’s IV Outreach data.</p>
       </div>
       <div className="connect-grid">
         <div className="connect-card">
@@ -247,7 +286,7 @@ function Connect({ notify }) {
         </div>
         <div className="connect-card">
           <strong>Claude Code skill</strong>
-          <p className="small dim">{info.skillInstalled ? (info.skillCurrent ? 'Installed and up to date.' : 'Installed, but older than this version.') : 'Teaches Claude Code how to use Fitscout.'}</p>
+          <p className="small dim">{info.skillInstalled ? (info.skillCurrent ? 'Installed and up to date.' : 'Installed, but older than this version.') : 'Teaches Claude Code how to use IV Outreach.'}</p>
           <button className="btn" disabled={info.skillCurrent} onClick={async () => {
             try {
               await call('installSkill')

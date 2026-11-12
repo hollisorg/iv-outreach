@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 export const call = (method, args) => window.fitscout.call(method, args)
 export const on = (channel, cb) => window.fitscout.on(channel, cb)
@@ -6,13 +6,17 @@ export const on = (channel, cb) => window.fitscout.on(channel, cb)
 // Load something and reload it when the agent (or anything else) changes data, and every few seconds while the
 // window is visible, since the MCP server in Claude Desktop writes to the same database.
 export function useData(method, args, deps = []) {
-  const [data, setData] = useState(null)
+  const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
   const key = JSON.stringify(args || {})
+  const requestKey = method + key
+  const current = useRef(requestKey), sequence = useRef(0)
+  current.current = requestKey
   const load = useCallback(() => {
+    const request = ++sequence.current
     call(method, args).then(
-      (d) => (setData(d), setError(null)),
-      (e) => setError(e.message),
+      (data) => { if (current.current === requestKey && sequence.current === request) { setResult({ key: requestKey, data }); setError(null) } },
+      (e) => { if (current.current === requestKey && sequence.current === request) setError(e.message) },
     )
   }, [method, key, ...deps])
   useEffect(() => {
@@ -21,7 +25,7 @@ export function useData(method, args, deps = []) {
     const t = setInterval(() => document.visibilityState === 'visible' && load(), 5000)
     return () => (off(), clearInterval(t))
   }, [load])
-  return [data, load, error]
+  return [result?.key === requestKey ? result.data : null, load, error]
 }
 
 export const pct = (a, b) => (b ? Math.min(100, Math.round((100 * a) / b)) : 0)

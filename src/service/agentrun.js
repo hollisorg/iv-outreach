@@ -1,5 +1,5 @@
-// Running the person's own Claude Code or Codex headless for Fitscout's chat (ported from IV Studio's agentrun.js).
-// The agent gets Fitscout's MCP server plus web search and reading web pages (to research real businesses), and
+// Running the person's own Claude Code or Codex headless for IV Outreach's chat (ported from IV Studio's agentrun.js).
+// The agent gets IV Outreach's MCP server plus web search and reading web pages (to research real businesses), and
 // nothing else: no shell, no files.
 import { spawn } from 'node:child_process'
 
@@ -31,7 +31,7 @@ export function spawnAgent(exe, args, { cwd, env, platform = process.platform } 
 const tomlString = (s) => JSON.stringify(String(s))
 const tomlTable = (o) => `{${Object.entries(o).map(([k, v]) => `${k}=${tomlString(v)}`).join(',')}}`
 
-// Claude Code: Fitscout's tools plus its own web search and page reading, everything else off. persist keeps the
+// Claude Code: IV Outreach's tools plus its own web search and page reading, everything else off. persist keeps the
 // session so the next message can --resume it.
 export const WEB_TOOLS = ['WebSearch', 'WebFetch']
 export function claudeArgs({ mcpConfigFile, promptFile, model = '', persist = true, resume = null }) {
@@ -52,7 +52,7 @@ export function claudeArgs({ mcpConfigFile, promptFile, model = '', persist = tr
 }
 
 // Codex: `exec` for the first message, `exec resume <thread>` after, read-only sandbox, live web search on, and
-// Fitscout's server passed as config (the person's own config is skipped). tool_timeout_sec leaves room for the
+// IV Outreach's server passed as config (the person's own config is skipped). tool_timeout_sec leaves room for the
 // person to answer an Allow card.
 export function codexChatArgs({ mcp, model = '', resume = null }) {
   const key = `mcp_servers.${SERVER}`
@@ -91,6 +91,16 @@ export function chatAsk(name, args = {}) {
 }
 
 const LABELS = {
+  fitscout_premium_status: 'Checked Premium balance',
+  fitscout_premium_quote: 'Quoted paid research',
+  fitscout_premium_run: 'Requested paid research approval',
+  fitscout_premium_job: 'Checked paid research results',
+  fitscout_premium_cancel: 'Requested paid research stop',
+  fitscout_scanner_state: 'Checked business scans',
+  fitscout_save_scan: 'Saved a business search',
+  fitscout_run_scan: 'Scanned business categories',
+  fitscout_research_plan: 'Planned the lead search',
+  fitscout_save_research: 'Saved sourced research',
   fitscout_overview: 'Checked where things stand',
   fitscout_sender_profile: 'Looked at your sender profile',
   fitscout_read_website: 'Read a website',

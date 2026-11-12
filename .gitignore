@@ -1,4 +1,8 @@
 node_modules/
+server/.env
+server/data/
+server/*.log
+*.secret.json
 out/
 dist/
 data/
@@ -6,5 +10,23 @@ data/
 *.db-wal
 *.db-shm
 .env*
+!server/.env.example
 vendor/gmaps/*.exe
 build/icon-256.png
+.runtime/
+vendor/uv/*.exe
+__pycache__/
+
+# Local verification receipts, screenshots, profiles and operational logs.
+docs/verification/
+*.log
+*.pem
+*.key
+*.pfx
+*.p12
+*.secret.*
+app-settings.json
+premium-jobs.json
+chats/
+backups/
+.DS_Store

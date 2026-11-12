@@ -1,0 +1,45 @@
+import { useEffect, useRef, useState } from 'react'
+import { call } from '../api'
+import { BrandPreview, BRAND_COVERS } from './BrandIdentity'
+const GOALS=[['customers','Find new customers','Meet people or businesses who could use your offer.'],['partners','Build referral partnerships','Connect with businesses that serve a similar audience.'],['relationships','Grow existing relationships','Follow up with your contacts, referrals and people who opted in.']]
+const COLORS=['#f19dac','#e9ad74','#a1c9b5','#91bfe4','#baa4ee']
+export default function WorkspaceDialog({ kind, business, onClose, onCreated }) {
+  const isBusiness=kind!=='campaign',editing=kind==='edit-business',dialog=useRef(null)
+  const [step,setStep]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useState('')
+  const [form,setForm]=useState({name:editing?business.name:'',website:editing?business.profile.website||'':'',offer:(!isBusiness||editing)?business?.profile?.offer||'':'',audience:(!isBusiness||editing)?business?.profile?.audience||'':'',location:(!isBusiness||editing)?business?.profile?.location||'':'',goal:'customers',accent:editing?business?.profile?.accent||COLORS[0]:COLORS[0],cover_preset:editing?business?.profile?.cover_preset||'signal':'signal',...(editing?{logo_id:business.profile.logo_id,cover_id:business.profile.cover_id}:{}),firstCampaign:true,planName:''})
+  const [art,setArt]=useState(editing?business.art||{}:{})
+  const steps=isBusiness?['Your business','Make it yours','Your audience','Ready to grow']:['Your goal','Your audience','Your plan']
+  const heading=isBusiness?['Give your business a home.','Make it instantly yours.','Who do you want to help?','Your next chapter starts here.'][step]:['What would you like to achieve?','Start with the right people.','A focused plan, ready to go.'][step]
+  const change=(key,value)=>setForm(f=>({...f,[key]:value}))
+  const goal=GOALS.find(g=>g[0]===form.goal)
+  const planName=form.planName.trim()||`${goal[1]}${form.location.trim()?` · ${form.location.trim()}`:''}`
+  useEffect(()=>{dialog.current.showModal()},[])
+  useEffect(()=>{dialog.current.querySelector('.wizard-body')?.scrollTo({top:0});dialog.current.querySelector('h2')?.focus()},[step])
+  const pick=async key=>{setBusy(true);setError('');try{const asset=await call('chooseBrandImage',{kind:key});if(asset){change(`${key}_id`,asset.id);setArt(a=>({...a,[key]:asset.dataUrl}))}}catch(e){setError(e.message)}finally{setBusy(false)}}
+  const campaignData={name:planName,offer:form.offer,icp:{notes:`Goal: ${goal[1]}. Audience: ${form.audience}`,locations:form.location?[form.location]:[]}}
+  const save=async()=>{
+    if(busy)return;setBusy(true);setError('')
+    try {
+      if(isBusiness){
+        const profile=Object.fromEntries(['website','offer','audience','location','accent','cover_preset','logo_id','cover_id'].filter(k=>form[k]!==undefined).map(k=>[k,form[k]]))
+        if(editing){await call('updateBusiness',{id:business.id,name:form.name,profile});onCreated(business.id,undefined)}
+        else {const result=await call('createBusinessSetup',{name:form.name,profile,campaign:form.firstCampaign?campaignData:null});onCreated(result.business.id,result.campaign?.id||null)}
+      }else {const result=await call('createCampaign',{...campaignData,business_id:business.id});onCreated(business.id,result.id)}
+    }catch(e){setError(e.message);setBusy(false)}
+  }
+  const field=(key,label,placeholder='')=><label><span>{label}</span><input value={form[key]||''} maxLength={key==='name'||key==='planName'?160:1200} placeholder={placeholder} onChange={e=>change(key,e.target.value)}/></label>
+  const preview={name:form.name,profile:form,art}
+  return <dialog ref={dialog} className="brand-wizard" aria-label={editing?'Edit business':isBusiness?'Add a business':'Create a campaign'} onCancel={e=>{e.preventDefault();if(!busy)onClose()}}>
+    <aside className="wizard-rail"><p className="eyebrow">IV Outreach / {isBusiness?'Business setup':'Outreach plan'}</p><div className="wizard-steps">{steps.map((name,i)=><div key={name} className={i===step?'on':i<step?'done':''} aria-current={i===step?'step':undefined}><b>{i<step?'✓':String(i+1).padStart(2,'0')}</b><span>{name}</span></div>)}</div><p className="wizard-note">{isBusiness?'One business. Its own look, audience and outreach plans.':'A campaign is simply one focused outreach plan. Pick an audience, an offer and a goal. Nothing sends until you approve.'}</p></aside>
+    <form className="wizard-content" onSubmit={e=>{e.preventDefault();if(step===steps.length-1)save();else if(!busy&&(!isBusiness||step!==0||form.name.trim()))setStep(step+1)}}>
+      <div className="wizard-body" data-guide="wizard-content"><p className="eyebrow">Step {step+1} of {steps.length}</p><h2 tabIndex={-1}>{heading}</h2>
+      {isBusiness&&step===0&&<><p>Use your business or brand name. You can keep several businesses here, each with its own campaigns and leads.</p><div className="form-grid">{field('name','Business name','e.g. Hollis Organization Inc.')}{field('website','Website (optional)','https://yourbusiness.com')}</div><div className="wizard-explain"><strong>Business → Campaign → Leads</strong><p>Your business is who you are. A campaign is one outreach plan. Leads are the people or businesses you find for that plan.</p></div></>}
+      {isBusiness&&step===1&&<><p>Add a logo and a cover so you always know which business you’re working on. You can skip this and change it later.</p><BrandPreview business={preview}/><div className="brand-image-actions">{['logo','cover'].map(k=><div key={k}><button type="button" className="btn" disabled={busy} onClick={()=>pick(k)}>Choose {k==='logo'?'logo':'cover graphic'}</button>{form[`${k}_id`]&&<button type="button" className="btn btn-quiet" onClick={()=>{change(`${k}_id`,'');setArt(a=>({...a,[k]:null}))}}>Remove {k}</button>}</div>)}</div><p className="small dim">PNG, JPEG or WebP · up to 8 MB · stored on this PC</p><div className="brand-swatches" aria-label="Brand accent color">{COLORS.map(color=><button type="button" key={color} aria-label={`Brand color ${color}`} aria-pressed={form.accent===color} style={{background:color}} onClick={()=>change('accent',color)}/>)}</div><p className="small dim">Or start with an IV cover:</p><div className="brand-cover-options">{Object.entries(BRAND_COVERS).map(([id,url])=><button type="button" key={id} aria-label={`${id} cover`} aria-pressed={!form.cover_id&&form.cover_preset===id} onClick={()=>{change('cover_preset',id);change('cover_id','');setArt(a=>({...a,cover:null}))}}><img src={url} alt=""/></button>)}</div></>}
+      {((isBusiness&&step===2)||(!isBusiness&&step===1))&&<><p>Give your agent a useful starting point. It can help refine these details with you later.</p><div className="form-grid">{field('offer','What do you offer? (optional)','e.g. AI-designed websites and booking tools')}{field('audience','Who do you want to reach? (optional)','e.g. Independent home service businesses')}{field('location','Location or region (optional)','e.g. Columbus, Ohio or anywhere')}</div></>}
+      {!isBusiness&&step===0&&<><div className="wizard-explain"><strong>A campaign is an outreach plan.</strong><p>For example: “Meet local referral partners” for your real estate business. It keeps that goal’s leads, research and draft messages together.</p></div><div className="goal-options">{GOALS.map(([id,title,about])=><button type="button" key={id} aria-pressed={form.goal===id} onClick={()=>change('goal',id)}><b>{title}</b><span>{about}</span><i aria-hidden="true">{form.goal===id?'●':'○'}</i></button>)}</div></>}
+      {step===steps.length-1&&<><BrandPreview business={isBusiness?preview:business}/><dl className="wizard-review"><div><dt>Offer</dt><dd>{form.offer||'Refine this with your agent'}</dd></div><div><dt>Audience</dt><dd>{form.audience||'Choose with your agent'}</dd></div><div><dt>Region</dt><dd>{form.location||'No region set'}</dd></div></dl>{isBusiness&&!editing&&<label className="wizard-first-plan"><input type="checkbox" checked={form.firstCampaign} onChange={e=>change('firstCampaign',e.target.checked)}/><span>Create my first outreach plan<small>A campaign gives your first leads a place to belong.</small></span></label>}{(!isBusiness||(isBusiness&&!editing&&form.firstCampaign))&&field('planName','Name your outreach plan (optional)',planName)}<p className="small dim">{editing?'Your existing campaigns and leads stay with this business.':'This saves your setup. You choose when to research, draft and approve outreach.'}</p></>}
+      {error&&<p role="alert" className="error">{error}</p>}</div>
+      <footer><button type="button" className="btn btn-quiet" disabled={busy} onClick={onClose}>Cancel</button><div>{step>0&&<button type="button" className="btn" disabled={busy} onClick={()=>setStep(step-1)}>← Back</button>}<button className="btn btn-primary" disabled={busy||(isBusiness&&step===0&&!form.name.trim())}>{busy?'Saving…':step<steps.length-1?'Continue →':editing?'Save business':isBusiness?'Create business':'Create outreach plan'}</button></div></footer>
+    </form>
+  </dialog>
+}

@@ -1,7 +1,7 @@
 # Bundled third-party tools
 
-Fitscout is a closed personal test (not distributed or sold), per Matthew, 2026-11-12. Both items were downloaded with
-his explicit OK and are shipped inside the installer under `resources/vendor`.
+IV Outreach is a closed personal test (not for sale), per Matthew, 2026-11-12. These tools are shipped inside the
+installer under `resources/vendor`. Retain license files when packaging.
 
 | Path | What | Source | License | Integrity |
 |---|---|---|---|---|
@@ -11,5 +11,9 @@ his explicit OK and are shipped inside the installer under `resources/vendor`.
 To restore the scraper on a fresh checkout, download that exact release asset into `vendor/gmaps/` as
 `google_maps_scraper.exe` and check the sha256 above. On first run it downloads its own browser driver.
 
-Not included, by decision: OpenOutreach (LinkedIn bot automation with stealth plugins), Blackbird's email
-enumeration (probes other sites' sign-up/reset endpoints), Firecrawl (skipped for now; AGPL, needs Docker or an API key).
+Version 0.3.0 uses the person's installed agent for public-source research. It neither includes nor launches
+OpenOutreach, uv, managed Python or the old provider bridge. `uv/` and `openoutreach/` in the source checkout are
+historical v0.2 assets excluded by the explicit package resource allowlist. Existing user-installed runtime files
+are left untouched but unused. See `docs/openoutreach-network-audit.md` for the historical audit.
+
+Not included: Blackbird's email enumeration via sign-up/reset endpoints, social-send automation, or Firecrawl.
