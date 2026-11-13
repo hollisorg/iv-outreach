@@ -10,7 +10,8 @@ B2B lead-gen company with a US trademark filing) was too close. fitscout.com was
 A quick web and trademark search found no conflict, but there has been no legal clearance. Owner: Matthew Hollis
 (The Hollis Organization).
 **Closed personal test, not for sale** (Matthew, 2026-11-12). Licensing no longer blocks tools; see Hard rules for what stays out.
-Folder: C:\Users\Matthew\Desktop\fitscout (private remote: https://github.com/hollisorg/iv-outreach). Installer: dist\IV-Outreach-Setup-<version>.exe.
+Folder: C:\Users\Matthew\Desktop\IVOutreach (private remote: https://github.com/hollisorg/iv-outreach). Installer: dist\IV-Outreach-Setup-<version>.exe.
+Use IVOutreach for new working paths. The former fitscout desktop path is retained for compatibility with existing Codex projects. This folder rename does not change the installed app's stable data directory, app ID, or MCP tool names.
 
 ## What it is
 
