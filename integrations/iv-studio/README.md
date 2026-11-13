@@ -8,4 +8,4 @@ The adjacent patches preserve the local IV Studio 1.1.13 integration without pub
 - No profile contents, credentials or generated media are included. The patch contains source, dependency lock, tests and usage documentation only.
 - The local build is installed and tested. A future public Studio update may supersede this private integration until the change is merged upstream. No public release was authorized or published for this task.
 
-Signal's matching source is in private `hollisorg/iv-signal`, commit `346ae4a2b419fdd1cd1589985696f0740583f3a0`. Outreach owns the common contract source. See [the integration guide](../../docs/iv-workspace.md).
+Signal's matching source is in private `hollisorg/iv-signal`, commit `f793b9d6cb8d09534c1c60d350f9666a4d425823`. Outreach owns the common contract source. See [the integration guide](../../docs/iv-workspace.md).
