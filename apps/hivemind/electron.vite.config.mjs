@@ -7,7 +7,7 @@ const root = fileURLToPath(new URL('.', import.meta.url))
 
 export default defineConfig({
   main: {
-    build: { outDir: resolve(root, 'out/main'), rollupOptions: { input: { index: resolve(root, 'main/index.js') } } },
+    build: { outDir: resolve(root, 'out/main'), rollupOptions: { input: { index: resolve(root, 'main/index.js'), mcp: resolve(root, 'mcp/server.js') } } },
   },
   preload: {
     build: {

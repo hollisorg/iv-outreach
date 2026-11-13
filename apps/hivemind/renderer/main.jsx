@@ -81,9 +81,46 @@ function Handoffs({ items, apps, launch, opening, brandId }) {
   )
 }
 
+const shortDate = value => {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+// What Hivemind actually did during a reply, shown from its own record rather than the agent's wording.
+function ActionCard({ action, onChoose, disabled }) {
+  if (action.type === 'opened') {
+    const { item } = action
+    return (
+      <div className="action-card opened" role="status">
+        <span className="action-kind"><span className="action-dot" aria-hidden="true" />Opened in {item.appName.replace('IV ', '')}</span>
+        <strong>{item.title}</strong>
+        <small>{[item.business, `${item.from.replace('IV ', '')} → ${item.appName.replace('IV ', '')}`, item.channel].filter(Boolean).join(' · ')}</small>
+        <small className="action-note">Returned to the existing {item.app === 'signal' ? 'draft' : 'project'}. Nothing new was created or approved.</small>
+      </div>
+    )
+  }
+  return (
+    <div className="action-card choose">
+      <span className="action-kind">Which one should open?</span>
+      <ul>
+        {action.items.map(item => (
+          <li key={item.id}>
+            <button type="button" disabled={disabled} onClick={() => onChoose(item.id)}>
+              <span><strong>{item.title}</strong><small>{[item.appName.replace('IV ', ''), `from ${item.from.replace('IV ', '')}`, item.channel, shortDate(item.updatedAt)].filter(Boolean).join(' · ')}</small></span>
+              <span aria-hidden="true">↗</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 function Chat({ brandId, available, apps, launch, opening, goHome }) {
   const [engine, setEngine] = useState(available.find(item => item.available)?.id || 'claude')
   const [messages, setMessages] = useState([])
+  const [steps, setSteps] = useState([])
+  const [choosing, setChoosing] = useState(false)
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -99,7 +136,8 @@ function Chat({ brandId, available, apps, launch, opening, goHome }) {
     setMessages([])
     setProblem('')
     const sync = data => {
-      setMessages(data.messages)
+      setMessages(data.messages || [])
+      setSteps(data.steps || [])
       setBusy(data.busy)
       setProblem(data.problem || '')
       setLoading(false)
@@ -138,6 +176,17 @@ function Chat({ brandId, available, apps, launch, opening, goHome }) {
     }
   }
 
+  async function choose(handoffId) {
+    if (busy || choosing) return
+    setChoosing(true)
+    setProblem('')
+    try {
+      const state = await api.choose({ brandId, engine, handoffId })
+      setMessages(state.messages)
+    } catch (error) { setProblem(error.message) }
+    finally { setChoosing(false) }
+  }
+
   return (
     <section className="chat" aria-label="Hivemind chat">
       <div className="chat-bar">
@@ -153,11 +202,18 @@ function Chat({ brandId, available, apps, launch, opening, goHome }) {
           <h2>What are you working on?</h2>
           <p>Plan work across the IV apps or draft copy using your selected business.</p>
           <div className="examples">
-            {['Summarize my recent handoffs', 'Draft a LinkedIn post', 'Plan a campaign'].map(prompt => <button type="button" key={prompt} disabled={!ready || busy} onClick={() => { setDraft(prompt); composer.current?.focus() }}>{prompt}</button>)}
+            {['Reopen my latest Signal draft', 'Summarize my recent handoffs', 'Draft a LinkedIn post'].map(prompt => <button type="button" key={prompt} disabled={!ready || busy} onClick={() => { setDraft(prompt); composer.current?.focus() }}>{prompt}</button>)}
           </div>
         </div>}
-        {messages.map((message, index) => <article className={`message ${message.role}`} key={index}><strong>{message.role === 'user' ? 'You' : 'Hivemind'}</strong><p>{message.text}</p></article>)}
-        {busy && <p className="chat-status" role="status">{engines[engine]} is working…</p>}
+        {messages.map((message, index) => (
+          <article className={`message ${message.role}`} key={index}>
+            <strong>{message.role === 'user' ? 'You' : 'Hivemind'}</strong>
+            {message.text && <p>{message.text}</p>}
+            {(message.actions || []).map((action, at) => <ActionCard key={at} action={action} onChoose={choose} disabled={busy || choosing || opening} />)}
+          </article>
+        ))}
+        {busy && <p className="chat-status" role="status">{steps.length ? `${steps.at(-1)}…` : `${engines[engine]} is working…`}</p>}
+        {choosing && <p className="chat-status" role="status">Opening…</p>}
         <div ref={end} />
       </div>
       {!ready && !loading && <p className="chat-status">Install and sign in to {engines[engine]} to chat here.</p>}

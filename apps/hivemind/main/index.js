@@ -5,6 +5,7 @@ import { APPS } from '../../../src/service/iv-workspace.js'
 import { findHarnesses } from '../../../src/service/harness.js'
 import { appStatus, openApp, readWorkspace } from './workspace.js'
 import { createChat } from './chat.js'
+import { chatActions } from './actions.js'
 
 const directory = dirname(fileURLToPath(import.meta.url))
 let window
@@ -53,9 +54,12 @@ function start() {
     }
   })
   handle('open-app', (id, handoffId) => openApp({ id, handoffId, programs }))
-  const conversation = () => chat ||= createChat({ directory: join(app.getPath('userData'), 'chat'), workspace, emit: publish })
+  const actions = chatActions({ readWorkspace, openApp, appStatus, programs })
+  const mcpScript = app.isPackaged ? join(process.resourcesPath, 'app.asar', 'out', 'main', 'mcp.js') : join(directory, 'mcp.js')
+  const conversation = () => chat ||= createChat({ directory: join(app.getPath('userData'), 'chat'), workspace, emit: publish, actions, mcpScript })
   handle('messages', (brandId, engine) => conversation().status(brandId, engine))
   handle('send', (request) => conversation().send(request))
+  handle('choose', (request) => conversation().choose(request))
   handle('stop', () => chat?.stop())
 
   window = new BrowserWindow({
@@ -75,6 +79,6 @@ if (!app.requestSingleInstanceLock()) app.quit()
 else {
   app.on('second-instance', focusWindow)
   app.whenReady().then(start)
-  app.on('before-quit', () => chat?.stop())
+  app.on('before-quit', () => { chat?.stop(); chat?.close() })
   app.on('window-all-closed', () => app.quit())
 }

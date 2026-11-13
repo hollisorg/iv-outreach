@@ -200,6 +200,17 @@ select { max-width: 300px; padding: 9px 32px 9px 10px; min-height: 39px; border:
 .message strong { color: #ffa8a3; font-size: 12px; }
 .message p { white-space: pre-wrap; margin-top: 6px; line-height: 1.55; }
 .chat-status { color: var(--muted); padding: 8px 0; font-size: 13px; }
+.action-card { margin-top: 10px; padding: 10px 12px; border: 1px solid #5e3c43; border-left: 3px solid var(--red); border-radius: 5px; background: #1f171b; display: grid; gap: 4px; }
+.action-card strong { color: var(--ink); font-size: 14px; }
+.action-card small { color: var(--muted); font-size: 12px; }
+.action-card .action-note { color: #d9c9c3; }
+.action-kind { display: flex; align-items: center; gap: 7px; font: 10px var(--mono); text-transform: uppercase; letter-spacing: .1em; color: #ffa8a3; }
+.action-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--red); }
+.action-card ul { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 6px; }
+.action-card li button { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 11px; min-height: 44px; text-align: left; border: 1px solid #5e3c43; border-radius: 5px; background: #281d22; }
+.action-card li button:hover:not(:disabled) { background: #38242b; border-color: #8d555c; }
+.action-card li button > span:first-child { display: grid; gap: 2px; min-width: 0; }
+.action-card li button > span:last-child { color: #ffa0a3; }
 .composer { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 9px; padding-top: 12px; border-top: 1px solid var(--border); }
 .composer textarea { resize: vertical; min-height: 54px; max-height: 180px; padding: 10px; border: 1px solid #6a474d; border-radius: 5px; background: #171216; }
 .primary { padding: 9px 14px; min-height: 40px; background: var(--red-button); color: #fff8f3; border: 1px solid #e75c64; border-radius: 5px; font-weight: 600; }
