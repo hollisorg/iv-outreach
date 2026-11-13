@@ -6,6 +6,7 @@ import { AgentRows, useAgentSetup } from '../components/AgentSetup'
 import ResearchSettings from '../components/ResearchSettings'
 import PremiumSettings from '../components/PremiumSettings'
 import AppUpdates from '../components/AppUpdates'
+import MailboxConnect from '../components/MailboxConnect'
 
 const FIELDS = [
   ['name', 'Your name'],
@@ -208,9 +209,10 @@ function Mailbox({ notify }) {
     <section className="panel set">
       <div className="set-head">
         <h2>Your mailbox</h2>
-        <p className="small dim">Email goes out from your own mailbox, one at a time at a human pace, while IV Outreach is open. Replies are read back every few minutes: they rank the lead, stop follow-ups, and anyone who says “stop” goes on do-not-contact. Your password is encrypted by Windows and never leaves this PC.</p>
+        <p className="small dim">Email goes out from your own mailbox, one approved message at a time while IV Outreach is open. Recent replies stop follow-ups, and anyone who says “stop” goes on do-not-contact. Credentials are encrypted locally and used only to connect to your mail provider.</p>
       </div>
-      <div className="form-grid two">
+      {st.oauth&&<MailboxConnect status={st.oauth} {...{reload,notify}}/>}
+      {!st.oauth?.connected&&<div className="form-grid two">
         <label>
           <span>Provider</span>
           <select value={mb.provider} onChange={(e) => save({ provider: e.target.value })}>
@@ -238,7 +240,7 @@ function Mailbox({ notify }) {
           </div>
           {preset.note && <span className="small dim">{preset.note}</span>}
         </label>
-      </div>
+      </div>}
       <div className="form-actions">
         <button className="btn" disabled={!st.ready || !st.hasPassword || !!busy} onClick={run('test', async () => setTest(await call('testMailbox')))}>{busy === 'test' ? 'Testing…' : 'Test connection'}</button>
         <label className="switch">
@@ -252,7 +254,7 @@ function Mailbox({ notify }) {
       </div>
       {test && (
         <p className="small">
-          Sending (SMTP): {test.smtp.ok ? <span className="ok">connected</span> : <span className="bad">{test.smtp.error}</span>} · Reading (IMAP): {test.imap.ok ? <span className="ok">connected</span> : <span className="bad">{test.imap.error}</span>}
+          {test.api?'Mailbox API':'Sending (SMTP)'}: {test.smtp.ok ? <span className="ok">connected</span> : <span className="bad">{test.smtp.error}</span>} · {test.api?'Reading':'Reading (IMAP)'}: {test.imap.ok ? <span className="ok">connected</span> : <span className="bad">{test.imap.error}</span>}
         </p>
       )}
       <p className="mono small dim">

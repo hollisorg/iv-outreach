@@ -18,9 +18,9 @@ const EXTRA_PATHS = ['/contact', '/contact-us', '/about', '/about-us']
 function isPrivateAddress(ip) {
   if (isIP(ip) === 6) {
     const v = ip.toLowerCase()
-    if (v === '::1' || v === '::' || v.startsWith('fe80') || v.startsWith('fc') || v.startsWith('fd')) return true
-    const mapped = v.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/)
-    return mapped ? isPrivateAddress(mapped[1]) : false
+    // Only global unicast; reject mapped/compatible loopback, link-local and ULA in every notation.
+    const first=parseInt(v.split(':')[0],16)
+    return !(first>=0x2000&&first<=0x3fff)||v.startsWith('2001:db8:')
   }
   const [a, b] = ip.split('.').map(Number)
   return a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) ||
@@ -29,6 +29,7 @@ function isPrivateAddress(ip) {
 
 async function assertPublicHost(hostname, allowPrivate) {
   if (allowPrivate) return
+  hostname=hostname.replace(/^\[|\]$/g,'')
   if (/^localhost$|\.local$|\.internal$/i.test(hostname)) throw new Error(`Refusing non-public host ${hostname}`)
   const addrs = isIP(hostname) ? [{ address: hostname }] : await lookup(hostname, { all: true })
   if (!addrs.length || addrs.some((a) => isPrivateAddress(a.address))) throw new Error(`Refusing non-public host ${hostname}`)

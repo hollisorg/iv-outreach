@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-export const call = (method, args) => window.fitscout.call(method, args)
+export const call = (method, args) => window.fitscout.call(method, args).catch(error=>{throw new Error(String(error.message||error).replace(/^Error invoking remote method '[^']+': (?:Error: )?/,''))})
 export const on = (channel, cb) => window.fitscout.on(channel, cb)
 
 // Load something and reload it when the agent (or anything else) changes data, and every few seconds while the

@@ -24,6 +24,9 @@ import { onboardingStatus, saveOnboarding, finishOnboarding } from '../service/o
 import updaterPackage from 'electron-updater'
 import { AppUpdates } from '../service/updates.js'
 import { createLeadPreview, webDestination } from '../service/lead-preview.js'
+import * as growth from '../core/opportunities.js'
+import {runOpportunityAudit,stopOpportunityAudit,auditBrowser} from '../service/opportunity-audit.js'
+import {MailOAuth} from '../service/mail-oauth.js'
 
 const leadPreview = createLeadPreview(nativeImage)
 
@@ -134,7 +137,8 @@ async function mailTick({ force = false } = {}) {
   if (mailState.busy) return mailState
   const mb = fs.getMailbox(getDb())
   const pw = mailPassword()
-  if (!fs.mailboxReady(mb) || !pw || (!mb.auto_send && !force)) return mailState
+  const oauth=mailOAuth.status().connected
+  if ((!oauth&&(!fs.mailboxReady(mb)||!pw)) || (!mb.auto_send && !force)) return mailState
   mailState.busy = true
   try {
     const key = JSON.stringify([mb.smtp_host, mb.smtp_port, mb.smtp_secure, mb.user])
@@ -142,7 +146,7 @@ async function mailTick({ force = false } = {}) {
       transport = fs.makeTransport(mb, pw)
       transportKey = key
     }
-    const r = await fs.sendNext(getDb(), transport, { minGapSeconds: mb.min_gap_seconds })
+    const r = await fs.sendNext(getDb(), oauth?mailOAuth.transport():transport, { minGapSeconds: mb.min_gap_seconds })
     mailState.lastSend = { at: new Date().toISOString(), ...r }
     mailState.error = r.error || null
     if (r.sent || r.error) send('data:changed', { tool: 'mail' })
@@ -157,10 +161,11 @@ let checking = false
 async function replyTick() {
   const mb = fs.getMailbox(getDb())
   const pw = mailPassword()
-  if (checking || !fs.mailboxReady(mb) || !pw) return null
+  const oauth=mailOAuth.status().connected
+  if (checking || (!oauth&&(!fs.mailboxReady(mb)||!pw))) return null
   checking = true
   try {
-    const r = await fs.checkReplies(getDb(), fs.makeImap(mb, pw))
+    const r = oauth?await mailOAuth.checkReplies(getDb()):await fs.checkReplies(getDb(), fs.makeImap(mb, pw))
     mailState.lastCheck = { at: new Date().toISOString(), ...r }
     if (r.replies || r.bounces) send('data:changed', { tool: 'replies' })
     return r
@@ -188,6 +193,11 @@ function writeSettings(patch) {
   return next
 }
 
+const mailOAuth=new MailOAuth({
+  read:()=>{const enc=readSettings().mailOAuthEnc;if(!enc||!safeStorage.isEncryptionAvailable())return null;try{return JSON.parse(safeStorage.decryptString(Buffer.from(enc,'base64')))}catch{return null}},
+  write:value=>{if(!safeStorage.isEncryptionAvailable())throw Error('Secure storage is unavailable on this PC.');writeSettings({mailOAuthEnc:safeStorage.encryptString(JSON.stringify(value)).toString('base64')})},
+  open:url=>shell.openExternal(url),
+})
 const premium = new PremiumClient({
   readSession: () => { const enc=readSettings().premiumSessionEnc; if(!enc||!safeStorage.isEncryptionAvailable())return null;try{return JSON.parse(safeStorage.decryptString(Buffer.from(enc,'base64')))}catch{return null} },
   writeSession: (session) => {if(session&&!safeStorage.isEncryptionAvailable())throw new Error('Secure account storage is unavailable on this PC.');writeSettings({premiumSessionEnc:session?safeStorage.encryptString(JSON.stringify(session)).toString('base64'):null})},
@@ -195,10 +205,11 @@ const premium = new PremiumClient({
 const paidFile=()=>join(fs.defaultDataDir(),'premium-jobs.json')
 const paidRecords=()=>{try{return JSON.parse(readFileSync(paidFile(),'utf8'))}catch{return {quotes:{},jobs:{}}}}
 const savePaidRecords=(r)=>{writeFileSync(paidFile()+'.tmp',JSON.stringify(r));renameSync(paidFile()+'.tmp',paidFile())}
+function contactVerification(lead_id){const lead=fs.getLead(getDb(),lead_id),v=fs.getSetting(getDb(),`contact-verification:${lead_id}`,null);return lead&&v&&v.email===lead.email?{...v,fresh:v.status==='deliverable'&&Date.parse(v.checked_at)>Date.now()-30*864e5}:null}
 function paidItems(capability,ids){
   if(!Array.isArray(ids)||ids.length<1||ids.length>25||new Set(ids).size!==ids.length)throw new Error('Choose 1–25 different leads.')
   return ids.map(id=>{const lead=fs.getLead(getDb(),id);if(!lead||lead.status==='suppressed'||fs.isSuppressed(getDb(),lead))throw new Error('A selected lead is unavailable or on do-not-contact.')
-    if(capability==='email_verify'){if(!lead.email)throw new Error('Email verification needs an existing address.');return {client_ref:id,email:lead.email}}
+    if(capability==='email_verify'){if(!lead.email)throw new Error('Email verification needs an existing address.');if(contactVerification(id)?.fresh)throw Error('This address already has a recent deliverable verification. No extra credits are needed.');return {client_ref:id,email:lead.email}}
     if(capability!=='email_find')throw new Error('Unsupported paid capability.')
     if(lead.email)throw new Error('This lead already has an email. Verify it instead.')
     const parts=String(lead.name||'').trim().split(/\s+/);if(parts.length<2)throw new Error('Find the real contact’s first and last name with free research first.')
@@ -206,23 +217,47 @@ function paidItems(capability,ids){
     return {client_ref:id,first_name:parts[0],last_name:parts.slice(1).join(' '),domain}
   })
 }
-async function paidQuote({capability,lead_ids}){
-  const items=paidItems(capability,lead_ids),quote=await premium.request('/v1/quotes',{capability,items})
-  const records=paidRecords();records.quotes[quote.id]={...quote,items,lead_ids};savePaidRecords(records);return quote
+const isDiscovery=cap=>['business_search','company_search'].includes(cap)
+function currentPaidItems(q){
+  if(!isDiscovery(q.capability))return paidItems(q.capability,q.lead_ids)
+  const c=fs.getCampaign(getDb(),q.campaign_id);if(!c||c.status!=='active'||c.business_id!==q.business_id)throw Error('Campaign changed. Request a new search quote.')
+  return q.items
+}
+async function paidQuote({capability,lead_ids=[],campaign_id,query,category,area,radius=10}){
+  let items,business_id
+  if(isDiscovery(capability)){
+    const c=fs.getCampaign(getDb(),campaign_id);if(!c||c.status!=='active')throw Error('Choose an active campaign.');business_id=c.business_id
+    if(capability==='company_search')items=[{client_ref:campaign_id,query:String(query||'').trim().slice(0,500)}]
+    else{if(!String(area||'').trim())throw Error('Enter a city and region.');const geo=await fs.geocode(String(area).slice(0,160));items=[{client_ref:campaign_id,category,latitude:Number(geo.lat),longitude:Number(geo.lng),radius:Number(radius)}]}
+  }else items=paidItems(capability,lead_ids)
+  const quote=await premium.request('/v1/quotes',{capability,items})
+  const records=paidRecords();records.quotes[quote.id]={...quote,items,lead_ids,campaign_id,business_id};savePaidRecords(records);return quote
 }
 async function paidRun({quote_id}){
   const records=paidRecords(),q=records.quotes[quote_id];if(!q)throw new Error('Request a new quote in this app first.')
   if(records.jobs[quote_id])return paidJob({job_id:records.jobs[quote_id]})
   if(q.expires<=Date.now())throw new Error('Quote expired. Request a new quote.')
-  if(JSON.stringify(paidItems(q.capability,q.lead_ids))!==JSON.stringify(q.items))throw new Error('Lead details changed. Request a new quote.')
-  const answer=await dialog.showMessageBox(win,{type:'question',title:'Use Premium credits?',message:`Use up to ${q.max_credits} credits?`,detail:`${q.capability==='email_find'?'Find business emails':'Verify emails'} for ${q.count} selected leads. Their contact details will be sent to the configured data service. No outreach will be sent.`,buttons:['Cancel','Use credits'],defaultId:0,cancelId:0,noLink:true})
+  if(JSON.stringify(currentPaidItems(q))!==JSON.stringify(q.items))throw new Error('Lead details changed. Request a new quote.')
+  const detail=isDiscovery(q.capability)?`One ${q.capability==='company_search'?'company':'local business'} search. The query/location goes to the configured data provider. A completed search uses ${q.max_credits} credits even with no matches. Candidates are reviewed before adding leads. Nothing will be sent.`:`${q.capability==='email_find'?'Find business emails':'Verify emails'} for ${q.count} selected leads. Their contact details will be sent to the configured data service. No outreach will be sent.`
+  const answer=await dialog.showMessageBox(win,{type:'question',title:'Use Premium credits?',message:`Use up to ${q.max_credits} credits?`,detail,buttons:['Cancel','Use credits'],defaultId:0,cancelId:0,noLink:true})
   if(answer.response!==1)throw new Error('Paid research was not approved. No credits used.')
   // Recheck after the person answers; they may have changed or suppressed a lead while the dialog was open.
-  if(JSON.stringify(paidItems(q.capability,q.lead_ids))!==JSON.stringify(q.items))throw new Error('Lead details changed. Request a new quote.')
+  if(JSON.stringify(currentPaidItems(q))!==JSON.stringify(q.items))throw new Error('Lead details changed. Request a new quote.')
   const job=await premium.request('/v1/jobs',{quote_id,max_credits:q.max_credits})
   const latest=paidRecords();latest.jobs[quote_id]=job.id;savePaidRecords(latest);return job
 }
-async function paidJob({job_id}){const r=paidRecords();if(!Object.values(r.jobs).includes(job_id))throw new Error('This job was started on another device. View it in the account history.');return premium.request(`/v1/jobs/${encodeURIComponent(job_id)}`)}
+async function paidJob({job_id}){const r=paidRecords();if(!Object.values(r.jobs).includes(job_id))throw new Error('This job was started on another device. View it in the account history.');const job=await premium.request(`/v1/jobs/${encodeURIComponent(job_id)}`);const qid=Object.keys(r.jobs).find(id=>r.jobs[id]===job_id),q=r.quotes[qid];if(q?.capability==='email_verify'&&job.state==='complete')for(const row of job.result){const lead=fs.getLead(getDb(),row.client_ref);if(q.lead_ids.includes(row.client_ref)&&lead?.email===row.email)fs.setSetting(getDb(),`contact-verification:${lead.id}`,row)}return job}
+async function paidImport({job_id,campaign_id,refs}){
+  const records=paidRecords(),qid=Object.keys(records.jobs).find(q=>records.jobs[q]===job_id),quote=records.quotes[qid]
+  if(!quote||!isDiscovery(quote.capability)||quote.campaign_id!==campaign_id)throw Error('Search does not belong to this campaign.')
+  currentPaidItems(quote)
+  if(!Array.isArray(refs)||!refs.length||refs.length>50)throw Error('Select up to 50 candidates.')
+  const job=await paidJob({job_id});if(job.state!=='complete')throw Error('Wait for the search to finish.')
+  return tx(getDb(),()=>{currentPaidItems(quote);const saved=fs.getSetting(getDb(),`discovery-import:${job_id}`,[]),rows=[...new Set(refs)].filter(ref=>!saved.includes(ref)).map(ref=>{const r=job.result.find(r=>r.client_ref===ref&&r.status==='candidate');if(!r)throw Error('Candidate not found.');return r})
+    const result=fs.addLeads(getDb(),campaign_id,rows.map(r=>({company:r.company,website:r.website,phone:r.phone,location:r.location,source:'website',source_url:r.source_url,notes:`Candidate from ${r.provider}, retrieved ${r.checked_at}. Verify website and campaign fit. No buying intent inferred.`})))
+    fs.setSetting(getDb(),`discovery-import:${job_id}`,[...new Set([...saved,...refs])]);send('data:changed',{tool:'paid-discovery'});return {...result,added:result.added.length}
+  })
+}
 async function paidApply({job_id,lead_id}){
   const job=await paidJob({job_id}),records=paidRecords(),qid=Object.keys(records.jobs).find(q=>records.jobs[q]===job_id),quote=records.quotes[qid]
   const row=job.result.find(r=>r.client_ref===lead_id),lead=fs.getLead(getDb(),lead_id)
@@ -234,7 +269,7 @@ async function paidApply({job_id,lead_id}){
   if(lead.email===row.email&&quote.capability==='email_find')return {lead_id,email:row.email,already_applied:true}
   const current=paidItems(quote.capability,[lead_id])[0]
   if(JSON.stringify(original)!==JSON.stringify(current))throw new Error('Contact details changed since this search. Review the result manually.')
-  const value=fs.updateLead(getDb(),lead_id,{email:row.email});send('data:changed',{tool:'premium-result'});return {lead_id:value.id,email:value.email,source:row.provider,verification:row.status,note:'Provider result, not a delivery guarantee.'}
+  const value=tx(getDb(),()=>{const updated=fs.updateLead(getDb(),lead_id,{email:row.email});fs.setSetting(getDb(),`contact-verification:${lead_id}`,row);return updated});send('data:changed',{tool:'premium-result'});return {lead_id:value.id,email:value.email,source:row.provider,verification:row.status,note:'Provider result, not a delivery guarantee.'}
 }
 async function openBilling(kind){const r=await premium.request(kind==='portal'?'/v1/portal':'/v1/checkout',kind==='portal'?{}:{kind});const u=new URL(r.url);if(u.protocol!=='https:'||!['checkout.stripe.com','billing.stripe.com'].includes(u.hostname))throw new Error('Billing returned an unexpected destination.');await shell.openExternal(u.toString());return {opened:true}}
 
@@ -312,8 +347,20 @@ const METHODS = {
   premiumJob:paidJob,
   premiumCancel:({job_id})=>premium.request(`/v1/jobs/${encodeURIComponent(job_id)}/cancel`,{}),
   premiumApply:paidApply,
+  premiumContactVerification:({lead_id})=>contactVerification(lead_id),
+  premiumImport:paidImport,
+  premiumSearchHistory:({campaign_id})=>{const r=paidRecords();return Object.values(r.quotes).filter(q=>q.campaign_id===campaign_id&&r.jobs[q.id]).reverse().slice(0,10).map(q=>({job_id:r.jobs[q.id],capability:q.capability}))},
   premiumLatest:async({lead_id})=>{const r=paidRecords();const q=Object.values(r.quotes).reverse().find(q=>q.lead_ids.includes(lead_id)&&r.jobs[q.id]);return q?paidJob({job_id:r.jobs[q.id]}):null},
   scannerState:({campaign_id})=>fs.scannerState(getDb(),campaign_id),
+  growthState:({campaign_id})=>({...growth.growthState(getDb(),campaign_id),audit_available:!!auditBrowser()}),
+  opportunityScan:async args=>{const value=await growth.opportunityScan(getDb(),args,{audit:runOpportunityAudit});send('data:changed',{tool:'opportunity'});return value},
+  watchSave:args=>growth.saveWatch(getDb(),args),
+  watchRemove:args=>growth.removeWatch(getDb(),args),
+  watchCheck:async args=>{const value=await growth.checkWatch(getDb(),args);send('data:changed',{tool:'watch'});return value},
+  contentBrief:args=>growth.contentBrief(getDb(),args),
+  briefExport:async({campaign_id,id,format='markdown'})=>{const brief=growth.growthState(getDb(),campaign_id).briefs.find(b=>b.id===id);if(!brief)throw Error('Brief not found.');const json=format==='json';const pick=await dialog.showSaveDialog(win,{title:'Save IV content brief',defaultPath:`IV-Content-Brief-${id}.${json?'json':'md'}`,filters:[{name:json?'IV brief JSON':'Content brief',extensions:[json?'json':'md']}]});if(pick.canceled)return {saved:false};writeFileSync(pick.filePath,json?JSON.stringify(brief,null,2):growth.briefMarkdown(brief),'utf8');return {saved:true}},
+  briefCopy:({campaign_id,id})=>{const brief=growth.growthState(getDb(),campaign_id).briefs.find(b=>b.id===id);if(!brief)throw Error('Brief not found.');clipboard.writeText(growth.briefMarkdown(brief));return true},
+  briefOpenApp:async({campaign_id,id,target})=>{if(!['studio','signal'].includes(target))throw Error('Choose IV Studio or IV Signal.');const name=target==='studio'?'IV Studio':'IV Signal',path=join(app.getPath('appData'),'..','Local','Programs',name,`${name}.exe`);if(!existsSync(path))throw Error(`${name} is not installed in the usual location. Use Copy brief instead.`);const brief=growth.growthState(getDb(),campaign_id).briefs.find(b=>b.id===id);if(!brief)throw Error('Brief not found.');clipboard.writeText(growth.briefMarkdown(brief));const error=await shell.openPath(path);if(error)throw Error(`Could not open ${name}. The brief is copied for manual paste.`);return {opened:true,copied:true,note:'Paste the brief into the app. Nothing was submitted automatically.'}},
   scannerSave:(args)=>fs.saveScan(getDb(),args),
   scannerRemove:({campaign_id,id})=>fs.removeScan(getDb(),campaign_id,id),
   scannerRun:async(args)=>{const r=await fs.runScan(getDb(),args);send('data:changed',{tool:'business-scan'});return r},
@@ -388,7 +435,11 @@ const METHODS = {
   mapsAvailable: () => !!fs.scraperPath(),
 
   // mailbox
-  mailStatus: () => ({ ...fs.mailStatus(getDb()), hasPassword: !!mailPassword(), encryption: safeStorage.isEncryptionAvailable(), presets: fs.MAIL_PRESETS, worker: { lastSend: mailState.lastSend, lastCheck: mailState.lastCheck, error: mailState.error } }),
+  mailStatus: () => ({ ...fs.mailStatus(getDb()), ...(mailOAuth.status().connected?{ready:true}:{}),oauth:mailOAuth.status(),hasPassword: !!mailPassword()||mailOAuth.status().connected, encryption: safeStorage.isEncryptionAvailable(), presets: fs.MAIL_PRESETS, worker: { lastSend: mailState.lastSend, lastCheck: mailState.lastCheck, error: mailState.error } }),
+  mailOAuthConfigure:args=>mailOAuth.configure(args),
+  mailOAuthConnect:async({provider})=>{if(mailState.busy||checking)throw Error('Wait for the mailbox task to finish.');const result=await mailOAuth.connect(provider);fs.saveMailbox(getDb(),{user:result.email,auto_send:false});transport=null;send('data:changed',{tool:'mailbox'});return result},
+  mailOAuthCancel:()=>mailOAuth.cancel(),
+  mailOAuthDisconnect:()=>{if(mailState.busy||checking)throw Error('Wait for the mailbox task to finish.');fs.saveMailbox(getDb(),{auto_send:false});return mailOAuth.disconnect()},
   saveMailbox: (patch) => fs.saveMailbox(getDb(), patch),
   setMailPassword: ({ password }) => {
     if (!safeStorage.isEncryptionAvailable()) throw new Error('This PC can\'t encrypt the password, so IV Outreach won\'t store it.')
@@ -403,6 +454,7 @@ const METHODS = {
     return true
   },
   testMailbox: async () => {
+    if(mailOAuth.status().connected){await mailOAuth.request(mailOAuth.status().provider==='google'?'/profile':'?$select=mail');return {smtp:{ok:true},imap:{ok:true},api:true}}
     const pw = mailPassword()
     if (!pw) throw new Error('Save the mailbox password first')
     return fs.testMailbox(fs.getMailbox(getDb()), pw)
@@ -457,14 +509,14 @@ const METHODS = {
     clipboard.writeText(String(text || ''))
     return { copied: true }
   },
-  appSettings: () => { const { openOutreach, mailPassEnc, premiumSessionEnc, ...settings } = readSettings(); return settings },
+  appSettings: () => { const { openOutreach, mailPassEnc, premiumSessionEnc, mailOAuthEnc, ...settings } = readSettings(); return settings },
   researchPlan: (args) => fs.researchPlan(getDb(), args),
   saveAppSettings: (patch) => {
     const clean = {}
     if (typeof patch.visualGuidanceEnabled === 'boolean') clean.visualGuidanceEnabled=patch.visualGuidanceEnabled
     if (['claude', 'codex', 'hermes', ''].includes(patch.chatEngine)) clean.chatEngine = patch.chatEngine
     for (const k of ['claudeModel', 'codexModel', 'agentName', 'userName']) if (typeof patch[k] === 'string') clean[k] = patch[k].trim().slice(0, 80)
-    const { openOutreach, mailPassEnc, premiumSessionEnc, ...settings } = writeSettings(clean)
+    const { openOutreach, mailPassEnc, premiumSessionEnc, mailOAuthEnc, ...settings } = writeSettings(clean)
     return settings
   },
 
@@ -628,6 +680,7 @@ const METHODS = {
   chatAnswer: ({ id, allow }) => !!chatTurn?.answer(String(id || ''), !!allow),
   chatStop: () => {
     chatTurn?.stop()
+    mailOAuth.cancel()
     return true
   },
 }
@@ -712,8 +765,9 @@ else {
     setTimeout(() => replyTick().catch(() => {}), 15000)
   })
   let cleanedUp = false
-  app.on('before-quit', () => {
+  app.on('before-quit', event => {
     if (cleanedUp) return
+    event.preventDefault()
     cleanedUp = true
     clearTimeout(updateStartup)
     clearInterval(updateTimer)
@@ -722,6 +776,7 @@ else {
     uiBridgeServer?.close()
     for(const pending of guideRequests.values()){clearTimeout(pending.timer);pending.reject(new Error('The app is closing.'))}
     guideRequests.clear()
+    stopOpportunityAudit().finally(()=>app.quit())
   })
   app.on('window-all-closed', () => app.quit())
 }

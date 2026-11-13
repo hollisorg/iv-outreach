@@ -1,5 +1,8 @@
 // Stable, named places shared by the visual guide and the agent. No arbitrary selectors from agents.
 export const PLACES = {
+  opportunity:{page:'scanning',selector:'[data-guide="scan-opportunity"]',fallback:'.scanning-page',title:'Find a useful opportunity',text:'Choose Opportunity scan, pick a lead with a website, then review source evidence and Lighthouse findings. Free local scans do not spend IV credits or establish buying intent.'},
+  watchlists:{page:'scanning',selector:'[data-guide="scan-watch"]',fallback:'.scanning-page',title:'Watch for a useful change',text:'Save a business page or RSS feed. Check now saves a baseline, then compares later content. It never sends a follow-up for you.'},
+  content_briefs:{page:'scanning',selector:'[data-guide="scan-brief"]',fallback:'.scanning-page',title:'Create an IV content brief',text:'Combine your brand, campaign and evidence into a draft. Copy or export it for IV Studio and IV Signal, then review before creating or publishing.'},
   workspace:{page:'today',selector:'[data-guide="workspace"]',title:'Your business and outreach plan',text:'Choose your business here, then open or create an outreach plan. A campaign is simply one plan with its own goal, audience and leads.'},
   business_brand:{page:'settings',selector:'[data-guide="brand-art"]',fallback:'#setup-businesses',title:'Make your business recognizable',text:'Edit your business to add a logo, a cover graphic and a brand color. Images stay on this PC. Each business can have its own look.'},
   business_profile:{page:'settings',selector:'#setup-businesses',title:'Your business brief',text:'Describe what you offer, who you help and where you want to grow. Your agent uses the selected business when it researches and drafts.'},
@@ -17,7 +20,7 @@ export const PLACES = {
 }
 export const GUIDES = {
   today:['workspace','today','scanning','leads','approve','social','agent','sender','mailbox','premium','boundaries'],
-  scanning:['workspace','scanning','leads'],leads:['workspace','leads','approve'],approve:['approve','sender','mailbox'],social:['social','boundaries'],
+  scanning:['workspace','scanning','opportunity','watchlists','content_briefs','leads'],leads:['workspace','leads','approve'],approve:['approve','sender','mailbox'],social:['social','boundaries'],
   settings:['business_brand','business_profile','agent','premium','sender','mailbox','connections','boundaries'],
 }
 export const startGuide = page => window.dispatchEvent(new CustomEvent('iv:guide',{detail:{steps:GUIDES[page]||GUIDES.today}}))

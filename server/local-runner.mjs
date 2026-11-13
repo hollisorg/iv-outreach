@@ -36,12 +36,13 @@ try{
  // Dedicated portal configuration; no edits to the account's default portal or live settings.
  stage='portal';let portalId=existsSync(join(root,'portal.json'))?JSON.parse(readFileSync(join(root,'portal.json'),'utf8')).id:null
  if(!portalId){const portal=await stripe.billingPortal.configurations.create({business_profile:{headline:'IV Outreach — test subscription management'},features:{customer_update:{enabled:false},invoice_history:{enabled:true},payment_method_update:{enabled:true},subscription_cancel:{enabled:true,mode:'at_period_end'}},metadata:{app:'iv_outreach',purpose:'local_test'}},{idempotencyKey:'iv-outreach-local-test-portal-v2'});portalId=portal.id;writeFileSync(join(root,'portal.json'),JSON.stringify({id:portalId}))}
- stage='catalog';const c=config({IV_LOCAL_TEST:'true',STRIPE_SECRET_KEY:profile.key,STRIPE_WEBHOOK_SECRET:secret,STRIPE_ACCOUNT_ID:profile.account,STRIPE_PREMIUM_PRICE_ID:'price_1Ub4F7ADnzKPQPbvov3vsOZD',STRIPE_TOPUP_PRICE_ID:'price_1Ub4FBADnzKPQPbvhV2qIes9',STRIPE_PORTAL_CONFIG_ID:portalId,IV_BILLING_DB:join(root,'premium.db')})
+ const providerEnvironment=Object.fromEntries(['IV_PROVIDER_MONTHLY_BUDGET_MICROS','IV_PROVIDER_CONTRACTS_APPROVED','BOUNCER_API_KEY','BETTERCONTACT_API_KEY','DATAFORSEO_LOGIN','DATAFORSEO_PASSWORD','EXA_API_KEY'].filter(k=>process.env[k]!==undefined).map(k=>[k,process.env[k]]))
+ stage='catalog';const c=config({...providerEnvironment,IV_LOCAL_TEST:'true',STRIPE_SECRET_KEY:profile.key,STRIPE_WEBHOOK_SECRET:secret,STRIPE_ACCOUNT_ID:profile.account,STRIPE_PREMIUM_PRICE_ID:'price_1Ub4F7ADnzKPQPbvov3vsOZD',STRIPE_TOPUP_PRICE_ID:'price_1Ub4FBADnzKPQPbvhV2qIes9',STRIPE_PORTAL_CONFIG_ID:portalId,IV_BILLING_DB:join(root,'premium.db')})
  store=new Store(c.database);const billing=new Billing(store,c,stripe);await billing.validate();store.recover()
  const app=createApp({store,config:c,billing,auth:new LocalTestAuth(c,device),providers:new Providers(c)})
  stage='listen';service=app.server;await new Promise((resolve,reject)=>{service.once('error',reject);service.listen(c.port,c.host,resolve)})
  writeFileSync(join(root,'connection.json'),JSON.stringify({url:c.origin,token:device.token}),{mode:0o600})
  timer=setInterval(()=>app.tick(),2000)
- status({ready:true,account:profile.account,test_mode:true,local_only:true,pid:process.pid,port:c.port,providers_enabled:false})
- console.log('IV Outreach local TEST backend ready on 127.0.0.1:4319. Hollis account verified; Stripe forwarding connected. No paid providers enabled.')
+ status({ready:true,account:profile.account,test_mode:true,local_only:true,pid:process.pid,port:c.port,providers_enabled:new Providers(c).catalog().some(x=>x.available)})
+ console.log('IV Outreach local TEST backend ready on 127.0.0.1:4319. Provider availability is shown in Settings. Stripe test mode does not make provider calls free.')
 }catch(e){status({ready:false,stage,error_type:/^[A-Za-z]+$/.test(e.type||'')?e.type:null,parameter:/^[a-z_\[\]]+$/.test(e.param||'')?e.param:null,reason:'Local test setup failed. Check the dedicated Stripe login and local port, then restart.'});cli?.kill();store?.close();console.error('Local test setup failed. No credentials logged.');process.exit(1)}

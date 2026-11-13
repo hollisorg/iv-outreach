@@ -13,5 +13,6 @@ export function config(env=process.env){
     supabaseUrl:env.SUPABASE_URL||'',supabaseKey:env.SUPABASE_ANON_KEY||'',
     providerBudget:integer('IV_PROVIDER_MONTHLY_BUDGET_MICROS',0),providersApproved:env.IV_PROVIDER_CONTRACTS_APPROVED==='true',
     bouncerKey:env.BOUNCER_API_KEY||'',betterContactKey:env.BETTERCONTACT_API_KEY||'',
+    dataForSeoLogin:env.DATAFORSEO_LOGIN||'',dataForSeoPassword:env.DATAFORSEO_PASSWORD||'',exaKey:env.EXA_API_KEY||'',
   }
 }

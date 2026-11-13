@@ -29,7 +29,7 @@ test('MCP server lists tools and runs a campaign round trip', async () => {
     }
     assert.ok(!names.includes('fitscout_find_with_openoutreach'))
     assert.ok(!names.includes('fitscout_openoutreach_status'))
-    for(const name of ['fitscout_premium_status','fitscout_premium_quote','fitscout_premium_run','fitscout_premium_job','fitscout_premium_cancel','fitscout_scanner_state','fitscout_save_scan','fitscout_run_scan'])assert.ok(names.includes(name))
+    for(const name of ['fitscout_premium_status','fitscout_premium_quote','fitscout_premium_run','fitscout_premium_job','fitscout_premium_cancel','fitscout_scanner_state','fitscout_save_scan','fitscout_run_scan','fitscout_growth_state','fitscout_opportunity_scan','fitscout_watch_save','fitscout_watch_check','fitscout_content_brief','fitscout_discovery_quote'])assert.ok(names.includes(name))
     const premium=await client.callTool({name:'fitscout_premium_status',arguments:{}})
     assert.equal(premium.isError,true)
     const call = async (name, args = {}) => {

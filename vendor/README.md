@@ -17,3 +17,5 @@ historical v0.2 assets excluded by the explicit package resource allowlist. Exis
 are left untouched but unused. See `docs/openoutreach-network-audit.md` for the historical audit.
 
 Not included: Blackbird's email enumeration via sign-up/reset endpoints, social-send automation, or Firecrawl.
+
+Growth build npm runtime additions (exact versions pinned in package-lock.json): Lighthouse 13.6.0 and chrome-launcher 1.2.3 (Apache-2.0), Mozilla Readability 0.6.0 (Apache-2.0), linkedom 0.18.15 (ISC), rss-parser 3.13.0 (MIT). Their license files ship with the packaged node modules; preserve dependency notices. Chrome/Edge is discovered on the user's PC, not redistributed. Crawlee and changedetection.io are deferred until their extra crawl/scheduling capabilities are needed; the current implementation uses the existing guarded fetcher and local watch records.

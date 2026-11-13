@@ -35,7 +35,7 @@ try{
  await win.getByRole('button',{name:'Use email',exact:true}).click();await win.getByText('Provider email saved. Nothing sent.',{exact:true}).waitFor()
  assert.equal(fixture.store.balance('fictional-demo').available,495)
  const check=core.openDb(join(data,'fitscout.db'));assert.equal(core.getLead(check,lead).email,'alex@example.test');assert.equal(core.listMessages(check,{}).length,0);check.close()
- await win.getByRole('button',{name:'Close',exact:true}).click();await win.locator('tbody tr').first().click();await win.getByText('complete',{exact:true}).waitFor()
+ await win.getByRole('button',{name:'Close lead profile',exact:true}).click();await win.locator('tbody tr').first().click();await win.getByText('complete',{exact:true}).waitFor()
  assert.deepEqual(errors,[])
  const result={passed:true,packaged,fictionalOnly:true,signIn:true,tokenHidden:true,savedScan:true,denialCharged:0,approvedCharge:5,resultsSurviveDrawerReopen:true,messages:0,errors};writeFileSync(join(out,`${packaged?'packaged-':''}ui.json`),JSON.stringify(result,null,2));console.log(JSON.stringify(result))
 }catch(e){console.log((await win.locator('main').innerText()).slice(-6000));console.log('UI_ERRORS',errors);await win.screenshot({path:join(out,'failure.png')});throw e}finally{await app.close();await fixture.close()}

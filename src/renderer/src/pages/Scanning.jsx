@@ -3,13 +3,19 @@ import {useData,when} from '../api'
 import BusinessScanner from '../components/BusinessScanner'
 import Discovery from '../components/Discovery'
 import MapsSearch from '../components/MapsSearch'
+import GrowthWorkspace from '../components/GrowthWorkspace'
+import PremiumDiscovery from '../components/PremiumDiscovery'
 import discoveryArt from '../assets/outreach-discovery-v1.png'
 import conversationArt from '../assets/outreach-conversation-v1.png'
 import heroArt from '../assets/outreach-hero-v1.png'
 const MODES=[
+ {id:'opportunity',tag:'Lead with something useful.',title:'Opportunity scan',about:'Turn a business website into clear evidence, a local audit and a thoughtful conversation starter.',needs:'A lead with a website',art:discoveryArt},
  {id:'local',tag:'A city. A market. New possibilities.',title:'Local markets',about:'Explore a place by business type. Bring back public listings to review with your agent.',needs:'A location + business types',art:discoveryArt},
  {id:'agent',tag:'Start with who you want to reach.',title:'Agent research',about:'Let Claude Code or Codex research businesses, check their websites and explain the fit.',needs:'Your campaign + your agent',art:conversationArt},
  {id:'custom',tag:'Follow something specific.',title:'Custom search',about:'Have a niche in mind? Go straight to Maps with your own business search and location.',needs:'A search phrase + a place',art:heroArt},
+ {id:'premium',tag:'Optional extra reach.',title:'Premium discovery',about:'Find company pages or structured local listings. Review a credit quote before any paid search.',needs:'Premium + connected data services',art:discoveryArt,paid:true},
+ {id:'watch',tag:'Notice the right moment.',title:'Watchlists & news',about:'Follow website changes and public news feeds. Keep useful reasons to reconnect close at hand.',needs:'A business page or RSS feed',art:conversationArt},
+ {id:'brief',tag:'One idea. Your IV ecosystem.',title:'Content briefs',about:'Bring your brand, audience and research together for IV Studio and IV Signal.',needs:'Your campaign + a content goal',art:heroArt},
 ]
 export default function Scanning({campaign,go,notify,openChat}){
  const [mode,setMode]=useState(null),selected=MODES.find(m=>m.id===mode)
@@ -17,9 +23,9 @@ export default function Scanning({campaign,go,notify,openChat}){
  return <div className={`page scanning-page ${mode?'scan-tool-page':'scan-gallery-page'}`}>
   {!selected?<>
    <header className="scan-stage" style={{'--scan-art':`url("${discoveryArt}")`}}><div className="scan-stage-orbit" aria-hidden="true"/><div><p className="eyebrow">Infinite Variance / Discovery</p><h1>Scanning</h1><p>Find your next conversation.</p></div></header>
-   <div className="scan-intro"><h2>Choose where to look.</h2><p>Three ways to discover real businesses. Your leads stay on this PC.</p></div>
-   <div className="scan-workflow-cards">{MODES.map(m=><button key={m.id} className="scan-workflow-card" aria-label={m.title} onClick={()=>setMode(m.id)} style={{'--scan-art':`url("${m.art}")`}}><span className="scan-card-art" aria-hidden="true"/><span className="eyebrow">{m.tag}</span><strong>{m.title}</strong><span className="scan-card-about">{m.about}</span><span className="scan-card-needs"><b>Needs</b> {m.needs}</span><span className="scan-card-footer">Free discovery <i aria-hidden="true">↗</i></span></button>)}</div>
-  </>:<header className="scan-tool-head"><button className="btn btn-quiet" onClick={()=>setMode(null)}>← All scans</button><div><p className="eyebrow">Free discovery / {selected.tag}</p><h1>{selected.title}</h1><p>{selected.about}</p></div></header>}
+   <div className="scan-intro"><h2>Find a lead. Start something useful.</h2><p>Discover businesses, understand opportunities and turn research into your next conversation.</p></div>
+   <div className="scan-workflow-cards">{MODES.map(m=><button key={m.id} data-guide={`scan-${m.id}`} className="scan-workflow-card" aria-label={m.title} onClick={()=>setMode(m.id)} style={{'--scan-art':`url("${m.art}")`}}><span className="scan-card-art" aria-hidden="true"/><span className="eyebrow">{m.tag}</span><strong>{m.title}</strong><span className="scan-card-about">{m.about}</span><span className="scan-card-needs"><b>Needs</b> {m.needs}</span><span className="scan-card-footer">{m.paid?'Optional credits':'Free workspace tool'} <i aria-hidden="true">↗</i></span></button>)}</div>
+  </>:<header className="scan-tool-head"><button className="btn btn-quiet" onClick={()=>setMode(null)}>← All scans</button><div><p className="eyebrow">{selected.paid?'Premium':'Free workspace'} / {selected.tag}</p><h1>{selected.title}</h1><p>{selected.about}</p></div></header>}
   {!campaign?<div className="scan-empty"><h2>Every search starts with a brief.</h2><p>Create a campaign with your agent, then choose where to look.</p><button className="btn btn-primary" onClick={openChat}>Open my agent</button></div>:<ScanWorkspace key={campaign.id} {...{campaign,go,notify,openChat,mode}}/>}
  </div>
 }
@@ -31,6 +37,8 @@ function ScanWorkspace({campaign,go,notify,openChat,mode}){
    <div className={`scan-workspace ${running?'is-scanning':''}`}>
     {mode==='local'&&<BusinessScanner {...{campaign,notify,openChat,go}} onDone={reload}/>}
     {mode==='agent'&&<Discovery campaign={campaign} openChat={openChat}/>}
+    {['opportunity','watch','brief'].includes(mode)&&<GrowthWorkspace key={mode} {...{mode,campaign,notify,openChat}}/>}
+    {mode==='premium'&&<PremiumDiscovery {...{campaign,notify,go}}/>}
     {mode==='custom'&&<section className="discovery-panel"><p className="eyebrow">Your own search</p><h2>Follow a specific lead.</h2><MapsSearch campaign={campaign} notify={notify} onDone={reload} initiallyOpen/><p className="small dim">Public Maps listings. No IV credits used. Results go to Leads for review.</p></section>}
    </div></>}
   {running&&<div className="scan-live" role="status"><span className="scan-live-line"/><strong>Exploring {running.area||'your market'}</strong><p className="small dim">{state?.categories?.[running.current]||'Starting'} · {running.completed||0} of {running.categories?.length||1} categories checked</p></div>}
