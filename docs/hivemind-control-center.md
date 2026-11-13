@@ -1,20 +1,17 @@
 # Hivemind control center direction
 
-Matthew's product direction, November 12, 2026: launch Hivemind as its own app. An animated brain sits in the center of a wheel. Outreach, Signal and Studio sit around it as app launch buttons. Clicking the brain opens a single agent chat that can coordinate the IV apps. Studio source and builds remain private.
-
-This is a proposed next phase. The current installed work renames the existing shared workspace and verifies native draft handoffs; it does not yet provide a standalone launcher or a cross-app agent.
+Hivemind is a standalone Windows app for opening IV Outreach, IV Studio, and IV Signal. The white IV eye opens a shared chat. The business picker filters saved handoffs, and each handoff opens in its receiving app. The chat uses an installed Claude Code or Codex session for planning and drafting with the selected workspace context.
 
 ## Interaction
 
-- Resting view: a gently animated brain, three clearly labeled app nodes, selected business and a small current-activity indicator. The orbit does not move click targets.
-- Brain click: transition into the conversation, keeping the three apps accessible. Keyboard activation and reduced-motion mode work too.
-- App node click: open the installed app at the relevant business/project/draft when available. Missing apps show a clear setup action.
-- Chat: request an outcome such as "Make Hollis a LinkedIn campaign." Show research, brief, creative project and post draft as linked steps, with progress and a way to open each result.
-- Approval cards name the app, business, action and any cost. A draft request does not authorize generating paid media or publishing it.
+- The wheel opens each app from its standard per-user Windows install location. An unavailable app is labeled in the wheel.
+- The eye opens chat while keeping the three app buttons within reach. Keyboard activation and reduced motion are supported.
+- The handoff list reads the shared workspace. Opening a handoff invokes its receiving app, where the existing receipt rules resolve the project or draft.
+- Chat saves conversations locally by business and agent. Each request includes the selected business context, recent handoff summaries, and a bounded conversation history. Use the app buttons and handoff links to act on the agent’s suggestions.
 
 ## Existing foundation and gaps
 
-The local handoff store already carries versioned business context, selected media and repeat-safe native draft receipts. The apps already have agent and MCP integration patterns. A coordinating agent still needs an explicit tool catalog spanning all three apps, app availability checks, resumable tasks, progress events, per-action permissions and a shared chat surface. Reuse app-owned operations rather than having the new chat write directly into three native databases.
+The local handoff store carries versioned business context, selected media, and repeat-safe native draft receipts. The launcher reads that store without a migration. Chat currently supports planning and drafting. Direct app actions will require an explicit tool catalog, progress events, and the receiving apps' existing approval rules.
 
 Keep account credentials in their owning app. Share the selected business and task context; avoid mixing brands' conversations or approvals. Store durable task state locally first. Keep the existing Hivemind data/IDs compatible.
 
@@ -27,8 +24,12 @@ Primary sources reviewed November 12, 2026:
 
 T3 Code describes itself as a control surface using existing agent harnesses, including Claude Code and Codex. It supports bringing an existing provider setup. Its root license permits modification/distribution while retaining the copyright and permission notice. This is evidence that a derivative is feasible, not a completed dependency/security review.
 
-Recommendation: prototype the wheel and one unified chat first, then compare T3's provider/session machinery against the IV apps' existing adapters. Evaluate a pinned T3 revision for Windows packaging, custom MCP tools, permission behavior, reconnect/session recovery, local-only operation and any hosted-service dependencies before committing to a full fork. Keep the IV-specific tool layer separate so the UI/provider foundation can change without rewriting the apps. No T3 fork, installation, account connection or background service was created in this task.
+The first desktop build reuses IV Outreach's agent discovery and stream parsing. The UI can support a different agent adapter later if the project needs one.
 
 ## Supplied identity and motion
 
-Matthew supplied logowhite.png as Hivemind's central identity: the existing white eye/infinity mark. Keep its shape intact. The shared UI now uses this exact asset with a subtle idle pulse and a brighter orbit during app handoffs. Reduced-motion mode is static. Carry this identity into the future central agent button and wheel; no generated replacement brain is needed. These are native UI animations, not generated video.
+The supplied white IV eye is the central chat button. It uses the same red accent as the companion apps, a subtle pulse, and a static reduced-motion mode. The engraved background is a new built-in ImageGen asset at `apps/hivemind/renderer/engraved-background.webp`.
+
+## Build and install
+
+Run `npm run hivemind:build` from the repository root to compile the standalone app, or `npm run hivemind:dist` to create the Windows installer in `apps/hivemind/dist`. The app has its own Windows shortcut and keeps chat history under `%APPDATA%\Hivemind\chat`.

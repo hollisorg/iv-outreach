@@ -46,6 +46,14 @@ try {
  await wins.signal.getByText('Here is a practical way to make appointment booking easier.',{exact:true}).first().waitFor({timeout:20000})
  const sdb=signalCore.openDb(join(dirs.signal,'signal.db'));const posts=sdb.prepare('select * from posts').all();assert.equal(posts.length,1);assert.equal(posts[0].status,'draft');assert.equal(sdb.prepare('select count(*) n from approvals').get().n,0);assert.equal(sdb.prepare('select count(*) n from deliveries').get().n,0);assert.equal(sdb.prepare('select count(*) n from media').get().n,1);sdb.close()
  const receipt=await api('signal','receive',{id:next.id});assert.equal(receipt.id,posts[0].id)
+ const previousReceipt=(await api('signal','state')).handoffs.find(x=>x.id===next.id).receipt.at
+ await api('outreach','open',{id:next.id});await deliver('signal',next.id)
+ await wins.signal.waitForFunction(async ([id,at])=>{
+  const state=await window.ivsignal.call('ivWorkspace',{method:'state'})
+  const receipt=state.handoffs.find(item=>item.id===id)?.receipt
+  return Boolean(receipt && receipt.at!==at && state.pending===null)
+ },[next.id,previousReceipt],{timeout:15000})
+ const reopenedSignal=await api('signal','state');assert.equal(reopenedSignal.handoffs.find(x=>x.id===next.id).receipt.id,posts[0].id)
  const w=new IVWorkspace({root:dirs.shared,appId:'outreach',profile:dirs.outreach});const shared=w.brand(h.brandId);w.saveBrand({...shared,voice:'A clear shared voice'},shared.revision);w.close()
  await api('outreach','state');await api('signal','state')
  const odb=core.openDb(join(dirs.outreach,'fitscout.db'));assert.equal(core.getBusiness(odb,business.id).profile.voice,'A clear shared voice');assert.equal(core.listMessages(odb,{}).length,0);odb.close()
@@ -61,6 +69,6 @@ try {
  await wins.studio.getByText('Explain helpful appointment booking',{exact:true}).first().waitFor({timeout:20000})
  const reopened=await api('studio','state');assert.equal(reopened.handoffs.find(x=>x.id===h.id).receipt.id,studioState.handoffs.find(x=>x.id===h.id).receipt.id)
  assert.deepEqual(errors,[])
- const result={passed:true,packaged,fictionalOnly:true,sharedBrand:true,studioProject:true,signalDraft:true,mediaCopied:true,retryNoDuplicate:true,coldLaunch:true,noApprovals:true,noPublishing:true,brandSyncBothApps:true,hivemindLogo:true,reducedMotion:true,handoffLoading:true,errors}
+ const result={passed:true,packaged,fictionalOnly:true,sharedBrand:true,studioProject:true,signalDraft:true,mediaCopied:true,retryNoDuplicate:true,reopenWhileRunning:true,coldLaunch:true,noApprovals:true,noPublishing:true,brandSyncBothApps:true,hivemindLogo:true,reducedMotion:true,handoffLoading:true,errors}
  writeFileSync(join(out,`${packaged?'packaged-':''}result.json`),JSON.stringify(result,null,2));console.log(JSON.stringify(result))
 }catch(e){for(const n of Object.keys(wins)){await capture(wins[n],join(out,`failure-${n}.png`)).catch(()=>{});console.log(n,(await wins[n].locator('body').innerText().catch(()=>'' )).slice(-1300))}console.log(errors);throw e}finally{for(const a of Object.values(apps))await a.close().catch(()=>{})}

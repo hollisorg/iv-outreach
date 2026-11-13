@@ -1,0 +1,23 @@
+{
+  "name": "iv-hivemind",
+  "productName": "Hivemind",
+  "version": "0.1.0",
+  "description": "The desktop workspace for IV Outreach, IV Studio and IV Signal.",
+  "author": "The Hollis Organization",
+  "license": "UNLICENSED",
+  "private": true,
+  "type": "module",
+  "main": "out/main/index.js",
+  "build": {
+    "appId": "org.hollis.hivemind",
+    "electronVersion": "44.9.1",
+    "files": ["out/**/*", "package.json"],
+    "win": { "target": "nsis", "icon": "../../src/renderer/src/assets/hivemind-logo.png" },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "Hivemind-Setup-${version}.exe",
+      "shortcutName": "Hivemind"
+    }
+  }
+}
