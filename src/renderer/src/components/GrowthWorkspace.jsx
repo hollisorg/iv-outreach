@@ -1,5 +1,6 @@
 import {useState} from 'react'
 import {call,useData,askAgent,when} from '../api'
+import {HivemindLoading,handoffBeat} from './HivemindMark'
 
 function Link({url,children}){return url?<button className="growth-link" onClick={()=>call('openLeadLink',{url}).catch(()=>{})}>{children||url} ↗</button>:null}
 export default function GrowthWorkspace({mode,campaign,notify,openChat}){
@@ -7,9 +8,10 @@ export default function GrowthWorkspace({mode,campaign,notify,openChat}){
  const [leadId,setLeadId]=useState(''),[busy,setBusy]=useState(''),[error,setError]=useState('')
  const rows=(Array.isArray(leads)?leads:leads?.leads||[]).filter(l=>l.website&&l.status!=='suppressed')
  const lead=rows.find(l=>l.id===leadId),scan=state?.scans.find(s=>s.lead_id===leadId)
- const act=(name,fn)=>async()=>{if(busy)return;setBusy(name);setError('');try{await fn();reload()}catch(e){setError(e.message)}finally{setBusy('')}}
+ const act=(name,fn)=>async()=>{if(busy)return;setBusy(name);setError('');try{await Promise.all([fn(),['studio','signal'].includes(name)?handoffBeat():Promise.resolve()]);reload()}catch(e){setError(e.message)}finally{setBusy('')}}
  const chat=text=>{askAgent({text});openChat()}
  return <section className="growth-workspace" aria-label="Business growth tools">
+  <HivemindLoading label={['studio','signal'].includes(busy)?`Opening your brief in IV ${busy==='studio'?'Studio':'Signal'}`:''}/>
   {error&&<p role="alert" className="premium-notice">{error}</p>}
   {mode==='opportunity'&&<>
    <div className="growth-intro"><span className="growth-step">01</span><div><h2>Find a useful reason to connect.</h2><p>Read up to three public website pages and run a local Lighthouse audit. No IV credits or AI API key required.</p></div></div>

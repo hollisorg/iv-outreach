@@ -1,7 +1,7 @@
 // Keep the versioned local contract and UI identical in explicitly supplied IV app worktrees.
 import { copyFileSync, mkdirSync, readFileSync } from 'node:fs'
 import { resolve, dirname, join } from 'node:path'
-const files = ['src/service/iv-workspace.js','src/service/iv-workspace-host.js','src/renderer/src/components/IVWorkspace.jsx','src/renderer/src/components/IVWorkspace.css']
+const files = ['src/service/iv-workspace.js','src/service/iv-workspace-host.js','src/renderer/src/components/IVWorkspace.jsx','src/renderer/src/components/IVWorkspace.css','src/renderer/src/components/HivemindMark.jsx','src/renderer/src/components/HivemindMark.css','src/renderer/src/assets/hivemind-logo.png']
 const targets = process.argv.slice(2)
 if (!targets.length) throw Error('Pass the Studio and/or Signal source directories.')
 for (const target of targets) {

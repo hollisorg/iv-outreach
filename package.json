@@ -1,7 +1,7 @@
 {
   "name": "fitscout",
   "productName": "IV Outreach",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "description": "Desktop lead finder: describe your ideal customer, Claude finds and researches matching businesses, drafts personal outreach for your approval, and ranks who replies.",
   "author": "The Hollis Organization",
   "license": "UNLICENSED",
@@ -102,7 +102,7 @@
     ],
     "protocols": [
       {
-        "name": "IV Workspace handoff",
+        "name": "Hivemind handoff",
         "schemes": [
           "iv-outreach"
         ]
