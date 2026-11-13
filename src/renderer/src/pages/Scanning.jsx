@@ -5,24 +5,29 @@ import Discovery from '../components/Discovery'
 import MapsSearch from '../components/MapsSearch'
 import GrowthWorkspace from '../components/GrowthWorkspace'
 import PremiumDiscovery from '../components/PremiumDiscovery'
-import discoveryArt from '../assets/outreach-discovery-v1.png'
-import conversationArt from '../assets/outreach-conversation-v1.png'
-import heroArt from '../assets/outreach-hero-v1.png'
+import heroArt from '../assets/scan-hero.webp'
+import opportunityArt from '../assets/scan-opportunity.webp'
+import localArt from '../assets/scan-local.webp'
+import agentArt from '../assets/scan-agent.webp'
+import customArt from '../assets/scan-custom.webp'
+import premiumArt from '../assets/scan-premium.webp'
+import watchArt from '../assets/scan-watch.webp'
+import briefArt from '../assets/scan-brief.webp'
 const MODES=[
- {id:'opportunity',tag:'Lead with something useful.',title:'Opportunity scan',about:'Turn a business website into clear evidence, a local audit and a thoughtful conversation starter.',needs:'A lead with a website',art:discoveryArt},
- {id:'local',tag:'A city. A market. New possibilities.',title:'Local markets',about:'Explore a place by business type. Bring back public listings to review with your agent.',needs:'A location + business types',art:discoveryArt},
- {id:'agent',tag:'Start with who you want to reach.',title:'Agent research',about:'Let Claude Code or Codex research businesses, check their websites and explain the fit.',needs:'Your campaign + your agent',art:conversationArt},
- {id:'custom',tag:'Follow something specific.',title:'Custom search',about:'Have a niche in mind? Go straight to Maps with your own business search and location.',needs:'A search phrase + a place',art:heroArt},
- {id:'premium',tag:'Optional extra reach.',title:'Premium discovery',about:'Find company pages or structured local listings. Review a credit quote before any paid search.',needs:'Premium + connected data services',art:discoveryArt,paid:true},
- {id:'watch',tag:'Notice the right moment.',title:'Watchlists & news',about:'Follow website changes and public news feeds. Keep useful reasons to reconnect close at hand.',needs:'A business page or RSS feed',art:conversationArt},
- {id:'brief',tag:'One idea. Your IV ecosystem.',title:'Content briefs',about:'Bring your brand, audience and research together for IV Studio and IV Signal.',needs:'Your campaign + a content goal',art:heroArt},
+ {id:'opportunity',tag:'Lead with something useful.',title:'Opportunity scan',about:'Turn a business website into clear evidence, a local audit and a thoughtful conversation starter.',needs:'A lead with a website',art:opportunityArt},
+ {id:'local',tag:'A city. A market. New possibilities.',title:'Local markets',about:'Explore a place by business type. Bring back public listings to review with your agent.',needs:'A location + business types',art:localArt},
+ {id:'agent',tag:'Start with who you want to reach.',title:'Agent research',about:'Let Claude Code or Codex research businesses, check their websites and explain the fit.',needs:'Your campaign + your agent',art:agentArt},
+ {id:'custom',tag:'Follow something specific.',title:'Custom search',about:'Have a niche in mind? Go straight to Maps with your own business search and location.',needs:'A search phrase + a place',art:customArt},
+ {id:'premium',tag:'Optional extra reach.',title:'Premium discovery',about:'Find company pages or structured local listings. Review a credit quote before any paid search.',needs:'Premium + connected data services',art:premiumArt,paid:true},
+ {id:'watch',tag:'Notice the right moment.',title:'Watchlists & news',about:'Follow website changes and public news feeds. Keep useful reasons to reconnect close at hand.',needs:'A business page or RSS feed',art:watchArt},
+ {id:'brief',tag:'One idea. Your IV ecosystem.',title:'Content briefs',about:'Bring your brand, audience and research together for IV Studio and IV Signal.',needs:'Your campaign + a content goal',art:briefArt},
 ]
 export default function Scanning({campaign,go,notify,openChat}){
  const [mode,setMode]=useState(null),selected=MODES.find(m=>m.id===mode)
  useEffect(()=>{document.querySelector('main')?.scrollTo({top:0})},[mode])
  return <div className={`page scanning-page ${mode?'scan-tool-page':'scan-gallery-page'}`}>
   {!selected?<>
-   <header className="scan-stage" style={{'--scan-art':`url("${discoveryArt}")`}}><div className="scan-stage-orbit" aria-hidden="true"/><div><p className="eyebrow">Infinite Variance / Discovery</p><h1>Scanning</h1><p>Find your next conversation.</p></div></header>
+   <header className="scan-stage" style={{'--scan-art':`url("${heroArt}")`}}><div className="scan-stage-orbit" aria-hidden="true"/><div><p className="eyebrow">Infinite Variance / Discovery</p><h1>Scanning</h1><p>Find your next conversation.</p></div></header>
    <div className="scan-intro"><h2>Find a lead. Start something useful.</h2><p>Discover businesses, understand opportunities and turn research into your next conversation.</p></div>
    <div className="scan-workflow-cards">{MODES.map(m=><button key={m.id} data-guide={`scan-${m.id}`} className="scan-workflow-card" aria-label={m.title} onClick={()=>setMode(m.id)} style={{'--scan-art':`url("${m.art}")`}}><span className="scan-card-art" aria-hidden="true"/><span className="eyebrow">{m.tag}</span><strong>{m.title}</strong><span className="scan-card-about">{m.about}</span><span className="scan-card-needs"><b>Needs</b> {m.needs}</span><span className="scan-card-footer">{m.paid?'Optional credits':'Free workspace tool'} <i aria-hidden="true">↗</i></span></button>)}</div>
   </>:<header className="scan-tool-head"><button className="btn btn-quiet" onClick={()=>setMode(null)}>← All scans</button><div><p className="eyebrow">{selected.paid?'Premium':'Free workspace'} / {selected.tag}</p><h1>{selected.title}</h1><p>{selected.about}</p></div></header>}
