@@ -93,6 +93,7 @@ export default function App() {
           <Wordmark tone="light" />
         </div>
         <div className="titlebar-mid">
+          <button className="help-launch" aria-label="How this works" title="Take a guided tour of this page" onClick={()=>startGuide(page)}><b aria-hidden="true">?</b><span>How this works</span><i className="help-beacon" aria-hidden="true"/></button>
           {['available', 'ready'].includes(update?.phase) && <button className="badge as-btn update-badge" onClick={() => { go('settings'); requestAnimationFrame(() => document.getElementById('setup-updates')?.scrollIntoView({block:'start'})) }}><span className="dot ok"/><span className="mono">{update.phase === 'ready' ? 'Update ready' : 'Update available'}</span></button>}
           <span className="badge" title={agent ? `The chat runs on your ${AGENT[agent]}` : 'No agent installed yet'}>
             <span className={`dot ${agent ? 'ok' : ''}`} />
@@ -125,8 +126,6 @@ export default function App() {
               </li>
             ))}
           </ul>
-
-          <button className="help-launch" aria-label="How this works" onClick={()=>startGuide(page)}><b aria-hidden="true">?</b><span>How this works</span><span className="help-arrow" aria-hidden="true">↗</span></button>
 
           <div className="side-foot">
             <p className="eyebrow">All businesses / Today</p>

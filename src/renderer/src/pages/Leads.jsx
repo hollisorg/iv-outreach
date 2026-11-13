@@ -103,7 +103,7 @@ export default function Leads({ campaign, leadId, setLeadId, notify, openChat, g
       {leadId && (
         <>
           <button className="drawer-backdrop" aria-label="Close lead details" onClick={() => setLeadId(null)} />
-          <LeadDrawer id={leadId} onClose={() => setLeadId(null)} notify={notify} onChanged={reload} />
+          <LeadDrawer key={leadId} id={leadId} onClose={() => setLeadId(null)} notify={notify} onChanged={reload} />
         </>
       )}
     </div>
@@ -121,14 +121,32 @@ function Score({ n, warm }) {
 }
 
 const CHANNELS = { email: 'Email', linkedin: 'LinkedIn', facebook: 'Facebook', instagram: 'Instagram', x: 'X', tiktok: 'TikTok', youtube: 'YouTube', pinterest: 'Pinterest', threads: 'Threads', phone: 'Phone', other: 'Other' }
-const PROFILE_KEYS = ['facebook', 'instagram', 'x', 'tiktok', 'youtube', 'pinterest', 'threads']
+const PROFILE_KEYS = ['linkedin', 'facebook', 'instagram', 'x', 'tiktok', 'youtube', 'pinterest', 'threads']
+
+function LeadLink({ url, children, notify, className = '' }) {
+  let href
+  try { const u = new URL(/^[a-z][a-z\d+.-]*:/i.test(url) ? url : `https://${url}`); if (['https:', 'http:'].includes(u.protocol) && !u.username && !u.password) href = u.href } catch {}
+  if (!href) return <span className="small dim">{children}</span>
+  return <a className={`lead-link ${className}`} href={href} target="_blank" rel="noreferrer" title={href} onClick={e => {e.preventDefault();call('openLeadLink', {url:href}).catch(e=>notify(e.message))}}>{children}<span aria-hidden="true">↗</span></a>
+}
+
+function LeadVisual({ lead, notify }) {
+  const [preview, setPreview] = useState(null)
+  useEffect(() => { let active = true; setPreview(null); call('leadPreview', {id:lead.id}).then(data=>{if(active)setPreview(data)}).catch(()=>{if(active)setPreview({})}); return ()=>{active=false} }, [lead.id, lead.website])
+  return <div className={`lead-visual ${preview?.image?'has-photo':''}`}>
+    {preview?.image && <img className="lead-cover" src={preview.image} alt={`${lead.company || lead.name} website image`}/>}
+    <div className="lead-visual-top"><span className="eyebrow">Business profile</span><span className={`chip st-${lead.status}`}>{STATUS[lead.status]}</span></div>
+    <div className="lead-visual-bottom"><span className="lead-avatar">{preview?.logo?<img src={preview.logo} alt=""/>:(lead.company||lead.name||'?').split(/\s+/).slice(0,2).map(w=>w[0]).join('')}</span><span className="small">{lead.category||'Your next connection'}<small>{preview?.image?'Image from their public website':!preview&&lead.website?'Looking for website imagery…':'Business snapshot'}</small></span></div>
+    {preview?.image && <LeadLink url={preview.source} notify={notify} className="lead-image-source">View website</LeadLink>}
+  </div>
+}
 
 // The lead's social profiles: confirmed ones (from its own site, or confirmed by you), and same-handle accounts the
 // lookup found elsewhere, which stay unconfirmed until you say they're this business.
 function Socials({ lead, notify, onChanged }) {
   const [busy, setBusy] = useState(false)
   const [handle, setHandle] = useState('')
-  const s = lead.socials || {}
+  const s = { ...lead.socials, ...(lead.linkedin_url ? { linkedin: lead.linkedin_url } : {}) }
   const confirmed = PROFILE_KEYS.filter((k) => s[k]).map((k) => [k, s[k]])
   const unconfirmed = (s.found || []).filter((f) => !f.confirmed)
   const find = async () => {
@@ -152,7 +170,7 @@ function Socials({ lead, notify, onChanged }) {
           {confirmed.map(([k, url]) => (
             <li key={k}>
               <span className={`chan ${k}`}>{CHANNELS[k]}</span>
-              <button className="link-btn mono small" onClick={() => call('openSocial', { url }).catch((e) => notify(e.message))}>{url.replace(/^https:\/\/(www\.)?/, '')}</button>
+              <LeadLink url={url} notify={notify}>{url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/,'')}</LeadLink>
             </li>
           ))}
         </ul>
@@ -170,7 +188,7 @@ function Socials({ lead, notify, onChanged }) {
             {unconfirmed.slice(0, 40).map((f) => (
               <li key={f.url} className="small">
                 <span className="mono">{f.site}</span>
-                <button className="link-btn mono small" onClick={() => call('openSocial', { url: f.url }).catch(() => notify('Only social platform links open from here. Copy it instead.'))}>{f.url.replace(/^https?:\/\/(www\.)?/, '')}</button>
+                <LeadLink url={f.url} notify={notify}>View profile</LeadLink>
                 {f.channel && (
                   <button className="btn btn-small" onClick={async () => {
                     try {
@@ -214,33 +232,36 @@ function LeadDrawer({ id, onClose, notify, onChanged }) {
     }
   }
   return (
-    <aside className="drawer" aria-label="Lead details">
+    <aside className="drawer lead-profile" aria-label="Lead details">
+      <div className="lead-profile-top"><span className="mono small">YOUR OPPORTUNITIES / PROFILE</span><button className="icon-btn" aria-label="Close lead profile" onClick={onClose}>×</button></div>
+      <LeadVisual lead={lead} notify={notify}/>
+      <div className="lead-profile-body">
       <header className="drawer-head">
         <div>
           <h2>{lead.name || lead.company}</h2>
           <p className="small dim">{[lead.name ? lead.company : null, lead.title, lead.location].filter(Boolean).join(' · ')}</p>
         </div>
-        <button className="icon-btn" aria-label="Close" onClick={onClose}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
-        </button>
       </header>
+      <div className="lead-destinations">
+        {lead.website && <LeadLink url={lead.website} notify={notify}>Visit website</LeadLink>}
+        <LeadLink url={lead.source === 'google_maps' && lead.source_url ? lead.source_url : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([lead.company||lead.name,lead.location].filter(Boolean).join(' '))}`} notify={notify}>{lead.source === 'google_maps' && lead.source_url ? 'Google Maps' : 'Find on Maps'}</LeadLink>
+        {lead.source_url && <LeadLink url={lead.source_url} notify={notify}>Original listing</LeadLink>}
+      </div>
+      <div className="lead-stat-grid"><div><small>Campaign fit</small><strong>{lead.fit_score ?? '—'}{lead.fit_score != null&&<em>/100</em>}</strong></div><div><small>Google rating</small><strong>{lead.rating != null ? `${lead.rating} ★` : '—'}</strong><span>{lead.review_count != null ? `${lead.review_count} reviews` : 'Not available'}</span></div><div><small>Conversation</small><strong>{lead.replies.length?'Replied':lead.messages.some(m=>m.status==='sent')?'Contacted':'Not yet'}</strong></div></div>
+      {lead.fit_reason && <p className="lead-fit-note">{lead.fit_reason}</p>}
+      <section className="lead-contact"><h3>Contact & location</h3>
       <dl className="facts">
-        <div><dt>Status</dt><dd><span className={`chip st-${lead.status}`}>{STATUS[lead.status]}</span></dd></div>
-        <div><dt>Fit</dt><dd>{lead.fit_score ?? '–'}{lead.fit_reason && <span className="small dim"> · {lead.fit_reason}</span>}</dd></div>
-        {lead.rating != null && <div><dt>Google</dt><dd>{lead.rating}★ from {lead.review_count} reviews{lead.category && <span className="small dim"> · {lead.category}</span>}</dd></div>}
+        {lead.location && <div><dt>Location</dt><dd>{lead.location}</dd></div>}
         {lead.phone && <div><dt>Phone</dt><dd className="mono small">{lead.phone}</dd></div>}
         <div><dt>Email</dt><dd className="mono small">{lead.email || '–'}{lead.email && <span className="dim"> ({lead.email_status.replace(/_/g, ' ')})</span>}</dd></div>
-        <div><dt>LinkedIn</dt><dd className="mono small">{lead.linkedin_url ? lead.linkedin_url.replace('https://www.', '') : '–'}</dd></div>
-        <div><dt>Website</dt><dd className="mono small">{lead.website || '–'}</dd></div>
-        {lead.source_url && <div><dt>Found on</dt><dd className="mono small">{lead.source_url}</dd></div>}
       </dl>
+      </section>
       {lead.research && <section className="research-evidence" aria-label="Research evidence">
         <h3>Why this business fits</h3>
         <p className="small dim">Agent research · {lead.research.confidence} confidence · {when(lead.research.checked_at)}. Buying intent unconfirmed.</p>
         <h4>Observed on public sources</h4>
         {lead.research.evidence.map((item, i) => <div className="msg-mini" key={i}>
-          <p className="small">{item.observation}</p><p className="mono small dim research-source">{item.url}</p>
-          <button className="btn btn-small" onClick={() => call('copyText', { text: item.url }).then(() => notify('Source URL copied.', 'ok')).catch(e=>notify(e.message))}>Copy source</button>
+          <p className="small">{item.observation}</p><LeadLink url={item.url} notify={notify}>Read source</LeadLink>
         </div>)}
         <h4>Potential opportunity</h4><p className="small">{lead.research.opportunity}</p>
         {lead.research.unknowns.length > 0 && <><h4>Still unknown</h4><ul className="small">{lead.research.unknowns.map((item,i)=><li key={i}>{item}</li>)}</ul></>}
@@ -307,6 +328,7 @@ function LeadDrawer({ id, onClose, notify, onChanged }) {
           </div>
         </section>
       )}
+      </div>
     </aside>
   )
 }

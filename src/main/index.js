@@ -23,6 +23,9 @@ import { tx } from '../core/db.js'
 import { onboardingStatus, saveOnboarding, finishOnboarding } from '../service/onboarding.js'
 import updaterPackage from 'electron-updater'
 import { AppUpdates } from '../service/updates.js'
+import { createLeadPreview, webDestination } from '../service/lead-preview.js'
+
+const leadPreview = createLeadPreview(nativeImage)
 
 const here = dirname(fileURLToPath(import.meta.url))
 let db
@@ -340,6 +343,8 @@ const METHODS = {
   updateCampaign: ({ id, ...patch }) => { const value=fs.updateCampaign(getDb(),id,patch); send('data:changed',{tool:'campaign'}); return value },
   listLeads: (args) => fs.listLeads(getDb(), args),
   getLead: ({ id }) => fs.getLead(getDb(), id),
+  leadPreview: ({ id }) => leadPreview(fs.getLead(getDb(), id)?.website),
+  openLeadLink: async ({ url }) => { await shell.openExternal(webDestination(url)); return true },
   updateLead: ({ id, ...patch }) => fs.updateLead(getDb(), id, patch),
   listMessages: (args) => fs.listMessages(getDb(), args),
   editMessage: ({ id, subject, body }) => fs.editMessage(getDb(), id, { subject, body }),

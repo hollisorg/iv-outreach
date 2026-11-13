@@ -34,12 +34,14 @@ async function assertPublicHost(hostname, allowPrivate) {
   if (!addrs.length || addrs.some((a) => isPrivateAddress(a.address))) throw new Error(`Refusing non-public host ${hostname}`)
 }
 
-export async function safeFetch(url, { allowPrivate = false, accept = 'text/html' } = {}) {
+export async function safeFetch(url, { allowPrivate = false, accept = 'text/html', binary = false, maxBytes = MAX_BYTES, beforeFetch } = {}) {
   let current = url
   for (let hop = 0; hop < 4; hop++) {
     const u = new URL(current)
     if (!['http:', 'https:'].includes(u.protocol)) throw new Error('Only http(s) URLs are allowed')
+    if (u.username || u.password) throw new Error('Credentials in URLs are not allowed')
     await assertPublicHost(u.hostname, allowPrivate)
+    if (beforeFetch) await beforeFetch(u)
     const res = await fetch(current, {
       redirect: 'manual',
       headers: { 'user-agent': UA, accept },
@@ -58,11 +60,12 @@ export async function safeFetch(url, { allowPrivate = false, accept = 'text/html
         const { done, value } = await reader.read()
         if (done) break
         size += value.length
-        if (size > MAX_BYTES) { await reader.cancel(); break }
+        if (size > maxBytes) { await reader.cancel(); if (binary) throw new Error('Image is too large'); break }
         chunks.push(value)
       }
     }
-    return { url: current, status: res.status, text: Buffer.concat(chunks).toString('utf8') }
+    const buffer = Buffer.concat(chunks)
+    return binary ? { url: current, status: res.status, buffer, type: res.headers.get('content-type') || '' } : { url: current, status: res.status, text: buffer.toString('utf8') }
   }
   throw new Error('Too many redirects')
 }
