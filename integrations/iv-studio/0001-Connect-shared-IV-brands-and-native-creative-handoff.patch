@@ -1,0 +1,663 @@
+From 9d5218e0a7ea14617b1770f7981cf0ec17ad64a4 Mon Sep 17 00:00:00 2001
+From: Matthew Hollis <matt@hollisorganization.com>
+Date: Thu, 12 Nov 2026 18:39:24 -0800
+Subject: [PATCH] Connect shared IV brands and native creative handoffs
+
+---
+ docs/iv-workspace.md                        |  42 +++++++
+ package-lock.json                           |  12 +-
+ package.json                                |  14 ++-
+ src/main/index.js                           |  11 +-
+ src/preload/index.js                        |   1 +
+ src/renderer/src/App.jsx                    |   3 +
+ src/renderer/src/components/IVWorkspace.css |   1 +
+ src/renderer/src/components/IVWorkspace.jsx |  94 ++++++++++++++
+ src/renderer/src/tours.js                   |   1 +
+ src/service/iv-workspace-host.js            | 125 ++++++++++++++++++
+ src/service/iv-workspace-import.js          |  18 +++
+ src/service/iv-workspace.js                 | 133 ++++++++++++++++++++
+ test/iv-workspace-import.mjs                |  16 +++
+ 13 files changed, 461 insertions(+), 10 deletions(-)
+ create mode 100644 docs/iv-workspace.md
+ create mode 100644 src/renderer/src/components/IVWorkspace.css
+ create mode 100644 src/renderer/src/components/IVWorkspace.jsx
+ create mode 100644 src/service/iv-workspace-host.js
+ create mode 100644 src/service/iv-workspace-import.js
+ create mode 100644 src/service/iv-workspace.js
+ create mode 100644 test/iv-workspace-import.mjs
+
+diff --git a/docs/iv-workspace.md b/docs/iv-workspace.md
+new file mode 100644
+index 0000000..ab144a2
+--- /dev/null
++++ b/docs/iv-workspace.md
+@@ -0,0 +1,42 @@
++# IV Workspace: local app continuity
++
++This build connects IV Outreach 0.12.0, IV Studio 1.1.10 and IV Signal 0.1.5 on one Windows account. It does not require a new account, server or provider subscription.
++
++## Use it
++
++1. Open each updated app once. The **IV Workspace** button in its top bar shows the other connected apps.
++2. In Outreach, choose your business and campaign, then Scanning → Content briefs. Prepare a brief and select **Create in IV Studio**. The business is linked to the shared workspace and Studio opens a native project with the campaign, offer, audience, voice, visual direction and source evidence in its creative notes.
++3. Work on the project in Studio using its existing tools. When ready, open **IV Workspace**, select that handoff, choose the finished picture/video files, review a caption and network, then select **Prepare in IV Signal**.
++4. Signal opens a native unapproved post draft with the selected media copied into its own library. Review the wording, media, alt text and network checks before using Signal's existing approval/publishing controls.
++
++Outreach can also hand a brief directly to Signal. It arrives as an idea; no caption is invented. Email/Website briefs do not silently become a social-network version.
++
++## Shared businesses
++
++Open IV Workspace → Shared businesses to create or edit a shared profile. **Share current business** connects an existing native business. **Use in this app** imports a shared profile or returns to its existing linked record; unrelated similarly named businesses are never silently merged.
++
++Name, website, offer, audience, voice, visual direction, location, goal, color and selected logo are shared. Linked Outreach and Signal business basics reconcile while their windows are open (approximately every four seconds). Concurrent changes in both places require an explicit choice of which profile to keep. App-specific fields such as Signal's Never say rules, channel connections, credentials, approvals and mailbox settings are not transferred. Studio reads the same shared businesses and saves a dated profile snapshot with each prepared project. Existing creative notes and post drafts are not rewritten when the brand changes.
++
++## Contract and storage
++
++- `%APPDATA%\IV Workspace\workspace.db`: independent SQLite WAL database, contract version 1. Brands have optimistic revisions; links are scoped by app and native profile path. Handoffs are immutable `iv.handoff.v1` records with source/target, parent, selected asset IDs and per-profile draft receipts.
++- `%APPDATA%\IV Workspace\assets`: selected files copied by SHA-256. File headers, extension, bounds and hashes are checked. Pictures max 30 MB; videos max 1 GB; logos PNG/JPG/WebP max 4 MB. No arbitrary paths or credentials in handoff URLs.
++- App links: `iv-studio://workspace/<UUID>` and `iv-signal://workspace/<UUID>`. Cold and existing-instance paths accept only valid local handoff IDs. Cross-app buttons launch the registered installed app directly with the same ID, with no shell or network listener.
++- A receiving app must register contract support by opening once. Missing/old apps leave a saved handoff and a clear update/open instruction. No clipboard fallback is described as a completed integration.
++- Studio uses a deterministic native production ID; Signal stores its native draft and receipt in the same transaction. Reopening preserves existing edits and cannot reapprove or republish anything.
++- This is a same-OS-user local boundary, not isolation from malicious programs already running as that user. There is no cloud sync, SSO, general shared-library browser or social analytics feedback in this phase.
++
++The common source lives in Outreach's `src/service/iv-workspace*.js` and `src/renderer/src/components/IVWorkspace.*`. Run `node scripts/sync-iv-workspace.mjs <Studio checkout> <Signal checkout>` to copy it to explicit app worktrees. Keep the contract and tests compatible across releases. Native adapters live in each app's `src/service/iv-workspace-import.js`.
++
++Test profiles use their own isolated workspace unless `IV_WORKSPACE_DIR` explicitly points all three at a disposable shared directory. Studio Incognito cannot access the shared workspace. The integration does not transfer tokens, accounts, agent sessions, full lead lists or unrelated files. Sharing context never authorizes generation, spending, scheduling, approval or publication.
++
++## Validation and rollout
++
++- Outreach's regression suite includes shared contract/revision/URL/media tests.
++- Studio's native import test proves one prepared project with evidence and no generation; its existing graph parity and tours checks remain applicable.
++- Signal's import tests prove draft-only behavior, retry safety and transaction rollback.
++- `node scripts/iv-workspace-ui-check.mjs [--packaged]` exercises three isolated windows, native draft navigation, selected media, shared profile reconciliation, duplicate protection, cold launch, responsive layouts and zero approvals/deliveries. It expects the two explicitly prepared source checkouts under `.runtime/iv-connect/`.
++
++Back up the three native profiles before installation. Outreach's native schema remains 6; the shared store is separate. Signal 0.1.5 includes the existing 0.1.4 migrations when upgrading an older installed version. Rollback to the respective prior installers and retain the shared folder for recovery; older apps ignore it. Do not remove generated projects or drafts just because an app was downgraded.
++
++Next phases: selecting existing Studio library outputs without a file picker, an app-wide shared asset browser, progress callbacks from generation/publishing, then optional account and cross-device synchronization.
+diff --git a/package-lock.json b/package-lock.json
+index 7393419..054f164 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1,12 +1,12 @@
+ {
+   "name": "iv-studio",
+-  "version": "1.1.3",
++  "version": "1.1.10",
+   "lockfileVersion": 3,
+   "requires": true,
+   "packages": {
+     "": {
+       "name": "iv-studio",
+-      "version": "1.1.3",
++      "version": "1.1.10",
+       "license": "MIT",
+       "dependencies": {
+         "@modelcontextprotocol/sdk": "1.32.1",
+@@ -21,7 +21,7 @@
+         "@fontsource/dm-sans": "5.3.0",
+         "@fontsource/jetbrains-mono": "5.3.0",
+         "@vitejs/plugin-react": "6.1.2",
+-        "electron": "44.9.0",
++        "electron": "44.9.1",
+         "electron-builder": "26.15.3",
+         "electron-vite": "6.0.0",
+         "react": "19.3.1",
+@@ -2514,9 +2514,9 @@
+       }
+     },
+     "node_modules/electron": {
+-      "version": "44.9.0",
+-      "resolved": "https://registry.npmjs.org/electron/-/electron-44.9.0.tgz",
+-      "integrity": "sha512-boP8zA5OIoMGYe3uWP4IqB1VJNoEzdHYgcBaVYnd1DBv5TogwXkbM4yJGSfNmYCzalVQ5J3TAIbaKOY+ILTnyg==",
++      "version": "44.9.1",
++      "resolved": "https://registry.npmjs.org/electron/-/electron-44.9.1.tgz",
++      "integrity": "sha512-x/tECFFDa2OFNjMObFH0EGKWrCnFZPOR1wP2iMIVt0STecGl8FmDXdaiaryY0kf8mtw9kSLP2yK8dfdaWkfDmw==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+diff --git a/package.json b/package.json
+index a9fe1e3..16579d3 100644
+--- a/package.json
++++ b/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "iv-studio",
+   "productName": "IV Studio",
+-  "version": "1.1.9",
++  "version": "1.1.10",
+   "description": "Infinite Variance studio for MiniMax H3: hunt previews, pick one, finish at 2 MP with DLSS. Built on ComfyUI, with an MCP server for agents.",
+   "author": "Infinite Variance",
+   "license": "MIT",
+@@ -32,7 +32,7 @@
+     "@fontsource/dm-sans": "5.3.0",
+     "@fontsource/jetbrains-mono": "5.3.0",
+     "@vitejs/plugin-react": "6.1.2",
+-    "electron": "44.9.0",
++    "electron": "44.9.1",
+     "electron-builder": "26.15.3",
+     "electron-vite": "6.0.0",
+     "react": "19.3.1",
+@@ -122,6 +122,14 @@
+     },
+     "dmg": {
+       "title": "IV Studio"
+-    }
++    },
++    "protocols": [
++      {
++        "name": "IV Workspace handoff",
++        "schemes": [
++          "iv-studio"
++        ]
++      }
++    ]
+   }
+ }
+diff --git a/src/main/index.js b/src/main/index.js
+index b1f83e1..79d5238 100644
+--- a/src/main/index.js
++++ b/src/main/index.js
+@@ -1,3 +1,5 @@
++import { workspaceHost } from '../service/iv-workspace-host.js'
++import { receiveStudio } from '../service/iv-workspace-import.js'
+ import { isHarness } from '../service/harness.js'
+ import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, powerSaveBlocker, protocol, safeStorage, screen, shell } from 'electron'
+ import fs from 'node:fs'
+@@ -144,6 +146,9 @@ const BASE = LOCATION.missing ? LOCATION.defaultDir : LOCATION.dir
+ setOllamaSource(() => readSettings(BASE).ollamaUrl)
+ const INCOGNITO = !!readSettings(BASE).incognito
+ const DATA = INCOGNITO ? incognitoDir(BASE) : BASE
++let ivWorkspace
++let pendingWorkspaceArgs = process.argv
++app.on('open-url',(event,url)=>{event.preventDefault();pendingWorkspaceArgs=[url];ivWorkspace?.capture([url])})
+ // Downloads and exports: Videos\IV Studio, or a folder inside the Incognito data
+ const videosDir = () => videosFolderOf(readSettings(BASE), { incognito: INCOGNITO, dataDir: DATA, videos: app.getPath('videos') })
+ let win = null
+@@ -1168,6 +1173,9 @@ app.whenReady().then(() => {
+   handle('editgen:cancel', (id, genId) => editgen.cancel(id, genId))
+   // ---------- Projects (a short film from script to rough cut) ----------
+   const productions = new Productions({ dataDir: DATA, studio: () => studio, voices: () => voices, images: () => images, previs: () => previs, catalog: () => catalog, edits, localCopy, onChange: (id) => send('productions:changed', { id }), model: () => readSettings(BASE).ollamaModel || undefined, writer: () => writerOf(readSettings(BASE)) })
++  ivWorkspace = workspaceHost({appId:'studio',dataDir:DATA,disabled:INCOGNITO,receive:(h,w)=>receiveStudio(h,w,productions)})
++  ivWorkspace.capture(pendingWorkspaceArgs);ivWorkspace.ready()
++  handle('workspace:call',(method,args)=>{if(!Object.hasOwn(ivWorkspace.api,method))throw Error('Unknown workspace action.');return ivWorkspace.api[method](args||{})})
+   handle('productions:list', () => productions.list())
+   handle('productions:get', (id) => productions.view(id))
+   handle('productions:create', (opts) => productions.create(opts))
+@@ -3070,7 +3078,8 @@ app.whenReady().then(() => {
+     comfyUp(boot.comfyUrl).then((up) => up || startComfy().catch(() => {}))
+ })
+ 
+-app.on('second-instance', () => {
++app.on('second-instance', (_event,args) => {
++  pendingWorkspaceArgs=args;ivWorkspace?.capture(args)
+   if (win) {
+     if (win.isMinimized()) win.restore()
+     win.focus()
+diff --git a/src/preload/index.js b/src/preload/index.js
+index 7c7210c..940cb3a 100644
+--- a/src/preload/index.js
++++ b/src/preload/index.js
+@@ -15,6 +15,7 @@ const on = (channel) => (cb) => {
+ }
+ 
+ contextBridge.exposeInMainWorld('ivstudio', {
++  workspace: { call: call('workspace:call') },
+   app: { info: call('app:info') },
+   // opt-in usage counting and the cloud beta signup (src/service/usage.js); time estimates (src/service/timing.js)
+   usage: { status: call('usage:status'), set: call('usage:set'), preview: call('usage:preview'), joinBeta: call('usage:joinBeta') },
+diff --git a/src/renderer/src/App.jsx b/src/renderer/src/App.jsx
+index c3b019b..833a973 100644
+--- a/src/renderer/src/App.jsx
++++ b/src/renderer/src/App.jsx
+@@ -1,3 +1,5 @@
++import IVWorkspace from './components/IVWorkspace'
++const ivWorkspaceApi = (method,args) => window.ivstudio.workspace.call(method,args)
+ import { useCallback, useEffect, useRef, useState } from 'react'
+ import { selectionFor } from './selection'
+ import { setSimpleWords } from './words'
+@@ -475,6 +477,7 @@ export default function App() {
+         <img className="brand-logo" src={incognito ? ivMarkClosed : ivMark} alt="Infinite Variance" />
+         <span className="mono brand-text">Infinite Variance</span>
+         <span className="mono dim brand-text">/ Studio</span>
++        <IVWorkspace api={ivWorkspaceApi} appId="studio" disabled={incognito} projectId={productionId} onOpen={r=>{if(r.kind==='production'){setWelcome(null);openProject(r.id)}}} />
+         {info?.testCopy && (
+           <span className="mono test-copy">
+             Test copy<span className="test-copy-more"> · separate data</span>
+diff --git a/src/renderer/src/components/IVWorkspace.css b/src/renderer/src/components/IVWorkspace.css
+new file mode 100644
+index 0000000..e5573cf
+--- /dev/null
++++ b/src/renderer/src/components/IVWorkspace.css
+@@ -0,0 +1 @@
++.ivw-launch{ -webkit-app-region:no-drag;display:inline-flex;align-items:center;gap:6px;background:#36202c;color:#ffdfeb;border:1px solid #916374;border-radius:7px;padding:5px 9px;font-family:inherit;font-size:11px;font-weight:600;line-height:1.5;cursor:pointer;white-space:nowrap}.ivw-launch:hover{background:#542c3f}.ivw-backdrop{position:fixed;inset:0;z-index:100000;background:#08050bbf;display:grid;place-items:center;padding:22px;-webkit-app-region:no-drag}.ivw-panel{color:#f4ede7;background:#171217;border:1px solid #765563;border-radius:18px;width:min(1100px,100%);max-height:calc(100vh - 44px);display:flex;flex-direction:column;box-shadow:0 25px 100px #0009;font:14px/1.55 Arial,sans-serif;overflow:hidden;animation:ivw-in .2s ease-out}.ivw-panel *{box-sizing:border-box}.ivw-header{display:flex;justify-content:space-between;align-items:flex-start;padding:25px 30px 20px;background:radial-gradient(ellipse at 90% 20%,#69243e66,transparent 60%),#21151e;flex-shrink:0}.ivw-panel h1{font-size:30px;margin:3px 0 0;letter-spacing:-1px}.ivw-panel h2{font-size:20px;line-height:1.3;margin:10px 0}.ivw-panel h3{font-size:17px}.ivw-panel p{margin:8px 0 14px}.ivw-panel small{font-size:10px;letter-spacing:.08em;color:#e7a8be}.ivw-panel button{font-family:inherit;font-size:13px;cursor:pointer;background:#30232d;color:#f6eae8;border:1px solid #70515f;border-radius:8px;padding:9px 12px;line-height:1.4}.ivw-panel button:hover{background:#4c2b3d}.ivw-panel button:disabled{opacity:.5;cursor:default}.ivw-panel button:focus-visible,.ivw-panel input:focus-visible,.ivw-panel textarea:focus-visible,.ivw-panel select:focus-visible{outline:2px solid #ffd3e0;outline-offset:3px}.ivw-panel .ivw-close{font-size:24px;line-height:1;padding:7px 11px}.ivw-apps{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:#61414d;border-block:1px solid #61414d;flex-shrink:0}.ivw-apps>div{padding:13px 24px;background:#211920}.ivw-apps>div.current{background:#422433}.ivw-apps b,.ivw-apps span{display:block}.ivw-apps span{font-size:11px;color:#c7b9c2;margin-top:3px}.ivw-tabs{display:flex;gap:8px;padding:14px 24px 0;flex-shrink:0}.ivw-tabs button[aria-pressed=true]{background:#f4d9de;color:#321924;border-color:#f4d9de}.ivw-body{padding:22px 24px;overflow:auto;min-height:200px}.ivw-work{display:grid;grid-template-columns:280px minmax(0,1fr);gap:24px}.ivw-worklist{border-right:1px solid #493440;padding-right:18px}.ivw-worklist h2{font-size:15px}.ivw-worklist>button{width:100%;text-align:left;display:grid;gap:6px;margin:10px 0}.ivw-worklist>button.selected{border-color:#ff9bbb;background:#452534}.ivw-worklist span{font-size:11px;color:#d6c0ca}.ivw-detail{min-width:0}.ivw-panel .ivw-primary{background:#b6214b;border-color:#ee6991;color:#fff;font-weight:700;margin-top:12px}.ivw-brandline{color:#ecb6c9}.ivw-detail details{background:#211a20;padding:12px 15px;border-radius:9px;margin:16px 0}.ivw-detail summary{cursor:pointer}.ivw-source{font-size:11px;overflow-wrap:anywhere;color:#d6c0ca}.ivw-note{font-size:12px;color:#c6b4bd;margin-top:18px!important}.ivw-forward{border-top:1px solid #59404d;margin-top:25px;padding-top:20px}.ivw-panel label{display:grid;gap:6px;margin:12px 0;color:#f2dce4}.ivw-panel textarea,.ivw-panel input,.ivw-panel select{background:#100d11;color:#f9f0eb;border:1px solid #6c4c5b;border-radius:7px;padding:10px;font:14px/1.5 Arial,sans-serif;width:100%;max-width:100%}.ivw-panel textarea{resize:vertical}.ivw-panel input[type=color]{width:80px;height:42px;padding:4px}.ivw-files{padding-left:18px}.ivw-file{display:flex;justify-content:space-between;gap:15px;align-items:center;margin-top:8px}.ivw-file span{overflow-wrap:anywhere}.ivw-empty{text-align:center;padding:60px 20px;color:#d5c4ce}.ivw-empty>span{font-size:60px;color:#c44a71}.ivw-brand-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:15px}.ivw-brand-actions>p{flex-basis:100%}.ivw-brands{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}.ivw-brands>button{display:grid;justify-items:start;gap:8px;text-align:left}.ivw-brands img,.ivw-logo{height:48px;width:48px;object-fit:contain;border-radius:8px;background:#fff}.ivw-initial{font-size:22px;padding:8px;background:#5d2e42;border-radius:8px}.ivw-brand-form{border-top:1px solid #64404f;margin-top:25px;padding-top:12px}.ivw-fields{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}.ivw-error,.ivw-conflicts{background:#521c32;padding:12px;border:1px solid #e46d94;border-radius:8px}.ivw-conflicts button{margin:4px}.ivw-footer{border-top:1px solid #503642;padding:12px 24px;display:flex;gap:12px;flex-wrap:wrap;font-size:10px;color:#c9abb9;flex-shrink:0}.ivw-footer span{color:#c5b8c2}.ivw-footer b{margin-left:auto}@keyframes ivw-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@media(max-width:760px){.ivw-backdrop{padding:8px}.ivw-panel{max-height:calc(100vh - 16px)}.ivw-work{grid-template-columns:1fr}.ivw-worklist{border-right:0;border-bottom:1px solid #493440;max-height:220px;overflow:auto}.ivw-fields{grid-template-columns:1fr}.ivw-apps>div{padding:10px}.ivw-header{padding:18px}.ivw-panel h1{font-size:24px}}@media(prefers-reduced-motion:reduce){.ivw-panel{animation:none}}
+diff --git a/src/renderer/src/components/IVWorkspace.jsx b/src/renderer/src/components/IVWorkspace.jsx
+new file mode 100644
+index 0000000..e9f5596
+--- /dev/null
++++ b/src/renderer/src/components/IVWorkspace.jsx
+@@ -0,0 +1,94 @@
++import { useEffect, useRef, useState } from 'react'
++import { createPortal } from 'react-dom'
++import './IVWorkspace.css'
++
++const NAMES = { outreach: 'IV Outreach', studio: 'IV Studio', signal: 'IV Signal' }
++const EMPTY = { name: '', website: '', offer: '', audience: '', voice: '', visual: '', location: '', goal: '', accent: '#bb2349', logo: null }
++
++export default function IVWorkspace({ api, appId, nativeId, nativeName, onOpen, projectId, disabled = false }) {
++  const [open, setOpen] = useState(false), [state, setState] = useState(null), [tab, setTab] = useState('work')
++  const [selected, setSelected] = useState(null), [editing, setEditing] = useState(null)
++  const [caption, setCaption] = useState(''), [channel, setChannel] = useState('linkedin'), [assets, setAssets] = useState([])
++  const [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('')
++  const opened = useRef(null), active = useRef(false), onOpenRef = useRef(onOpen), stateRef = useRef(null), dialogRef = useRef(null)
++  onOpenRef.current = onOpen
++  const load = async () => { const next = await api('state'); setState(next); stateRef.current = next; return next }
++  const act = async fn => {
++    if (active.current) return
++    active.current = true; setBusy(true); setError(''); setNotice('')
++    try { await fn(); await load() } catch (e) { setError(e.message); setOpen(true) } finally { active.current = false; setBusy(false) }
++  }
++  const openDraft = id => act(async () => { const receipt = await api('receive', { id }); await onOpenRef.current?.(receipt); setOpen(false) })
++  useEffect(() => {
++    if (disabled) return
++    let stopped = false
++    const refresh = async () => {
++      try {
++        const next = await api('state'); if (stopped) return
++        setState(next); stateRef.current = next
++        if (next.pending && next.pending !== opened.current) {
++          opened.current = next.pending; setSelected(next.pending); setOpen(true)
++          openDraft(next.pending)
++        }
++      } catch { /* The workspace is optional; the other app features stay available. */ }
++    }
++    refresh(); const timer = setInterval(refresh, 4000)
++    return () => { stopped = true; clearInterval(timer) }
++  }, [api, disabled])
++  useEffect(() => {
++    const show = e => { setSelected(e.detail?.id || null); setTab('work'); setOpen(true); load().catch(e => setError(e.message)) }
++    window.addEventListener('iv:workspace', show)
++    return () => window.removeEventListener('iv:workspace', show)
++  }, [api])
++  useEffect(() => {
++    if (!open) return
++    const previous = document.activeElement
++    const timer = setTimeout(() => dialogRef.current?.querySelector('button')?.focus(), 0)
++    const key = e => {
++      if (e.key === 'Escape' && !busy) { e.preventDefault(); setOpen(false) }
++      if (e.key === 'Tab') {
++        const items = [...(dialogRef.current?.querySelectorAll('button:not(:disabled),input,textarea,select,[href]') || [])].filter(el => el.offsetParent !== null)
++        const first = items[0], last = items.at(-1)
++        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus() }
++        if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus() }
++      }
++    }
++    document.addEventListener('keydown', key)
++    return () => { clearTimeout(timer); document.removeEventListener('keydown', key); previous?.focus?.() }
++  }, [open, busy])
++  const h = state?.handoffs.find(x => x.id === selected)
++  const choose = item => { setSelected(item.id); setCaption(item.brief.caption || ''); setAssets(item.assets); setChannel(['facebook','instagram','linkedin','x','threads','tiktok','youtube','pinterest','google'].includes(item.brief.channel.toLowerCase()) ? item.brief.channel.toLowerCase() : 'linkedin') }
++  const showWorkspace = () => {
++    setOpen(true); setError(''); load().then(s => {
++      const current = projectId && s.handoffs.find(x => x.receipt?.id === projectId)
++      if (current) choose(current)
++    }).catch(e => setError(e.message))
++  }
++  return <>
++    <button type="button" className="ivw-launch" onClick={showWorkspace} disabled={disabled} title={disabled ? 'Shared workspace is off in Incognito' : 'Continue across your IV apps'}><span aria-hidden="true">◈</span> IV Workspace</button>
++    {open && createPortal(<div className="ivw-backdrop" onMouseDown={e => { if (e.target === e.currentTarget && !busy) setOpen(false) }}>
++      <section className="ivw-panel" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="ivw-title">
++        <header className="ivw-header"><div><small>ONE BUSINESS. YOUR IV APPS.</small><h1 id="ivw-title">Your IV workspace</h1><p>Carry the context. Keep creating.</p></div><button className="ivw-close" aria-label="Close IV Workspace" onClick={() => setOpen(false)} disabled={busy}>×</button></header>
++        <div className="ivw-apps">{Object.keys(NAMES).map(id => <div key={id} className={id === appId ? 'current' : ''}><b>{NAMES[id]}</b><span>{id === appId ? 'You are here' : state?.apps.find(a => a.id === id)?.ready ? 'Connected on this PC' : 'Update and open to connect'}</span></div>)}</div>
++        <nav className="ivw-tabs" aria-label="Workspace sections"><button aria-pressed={tab === 'work'} onClick={() => setTab('work')}>Connected work</button><button aria-pressed={tab === 'brands'} onClick={() => setTab('brands')}>Shared businesses</button></nav>
++        <div className="ivw-body">
++          {error && <p className="ivw-error" role="alert">{error}</p>}{notice && <p role="status">{notice}</p>}
++          {!!state?.conflicts.length && <div className="ivw-conflicts"><b>A business changed in two apps.</b>{state.conflicts.map(c => <div key={c.localId}><p>{c.name}: choose which version to keep.</p><button disabled={busy} onClick={() => act(() => api('useBrand', { brandId: c.brandId, localId: c.localId }))}>Use shared profile here</button><button disabled={busy} onClick={() => act(() => api('shareNative', { localId: c.localId, preferLocal: true }))}>Share this app’s profile</button></div>)}</div>}
++          {tab === 'work' && <div className="ivw-work">
++            <aside className="ivw-worklist"><h2>Continue where you left off</h2>{!state?.handoffs.length && <p>In Outreach, create a content brief and choose Create in IV Studio. It will appear here with the business and research attached.</p>}{state?.handoffs.map(item => <button className={item.id === h?.id ? 'selected' : ''} key={item.id} onClick={() => choose(item)}><small>{NAMES[item.source]} → {NAMES[item.target]}</small><b>{item.brief.title}</b><span>{item.brandSnapshot.name} · {item.status === 'draft-ready' ? 'Draft prepared' : 'Ready to continue'}</span></button>)}</aside>
++            <article className="ivw-detail">{h ? <><small>{h.brief.campaign || 'CREATIVE HANDOFF'}</small><h2>{h.brief.title}</h2><p className="ivw-brandline">{state.brands.find(b => b.id === h.brandId)?.name || h.brandSnapshot.name} · {h.brief.channel}</p><p>{h.brief.goal}</p><p>{h.brief.angle}</p><details><summary>Business context and source evidence</summary><p><b>Offer:</b> {h.brief.offer || h.brandSnapshot.offer}</p><p><b>Audience:</b> {h.brief.audience || h.brandSnapshot.audience}</p><p><b>Voice:</b> {h.brandSnapshot.voice}</p>{h.brief.evidence.map((e, i) => <div key={i}><b>{e.title}</b><p>{e.excerpt}</p><span className="ivw-source">{e.url}</span></div>)}</details>
++              {h.assets.length > 0 && <ul className="ivw-files">{h.assets.map(a => <li key={a.id}>{a.name} <small>{Math.ceil(a.bytes / 1024)} KB</small></li>)}</ul>}
++              {h.target === appId ? <button className="ivw-primary" disabled={busy} onClick={() => openDraft(h.id)}>{h.receipt ? 'Open prepared draft' : 'Prepare and open draft'}</button> : <button className="ivw-primary" disabled={busy} onClick={() => act(() => api('open', { id: h.id }))}>Continue in {NAMES[h.target]} ↗</button>}
++              {appId === 'studio' && h.target === 'studio' && h.receipt && <div className="ivw-forward"><small>NEXT / IV SIGNAL</small><h3>Prepare your social draft</h3><p>Attach the finished files you want to use and review the caption. Signal receives an unapproved draft.</p><label>Caption<textarea rows={4} value={caption} onChange={e => setCaption(e.target.value)} maxLength={12000}/></label><label>Network<select value={channel} onChange={e => setChannel(e.target.value)}>{['linkedin','instagram','facebook','x','threads','tiktok','youtube','pinterest','google'].map(c => <option key={c}>{c}</option>)}</select></label><button disabled={busy} onClick={() => act(async () => { const chosen = await api('pickAssets'); setAssets(previous => [...new Map([...previous, ...chosen].map(a => [a.id,a])).values()].slice(0,10)) })}>Choose finished pictures or videos</button>{assets.map(a => <div className="ivw-file" key={a.id}><span>{a.name}</span><button aria-label={`Remove ${a.name} from handoff`} onClick={() => setAssets(assets.filter(x => x.id !== a.id))}>×</button></div>)}<button className="ivw-primary" disabled={busy || (!caption.trim() && !assets.length)} onClick={() => act(async () => { await api('forward', { id: h.id, caption, channel, assets: assets.map(a => a.id) }); setNotice('Signal is opening your draft. Review it there before approving.') })}>Prepare in IV Signal ↗</button></div>}
++              <p className="ivw-note">Importing creates a draft. It does not generate media, spend credits, approve, schedule or publish.</p></> : <div className="ivw-empty"><span>◈</span><h2>Your work travels with you.</h2><p>Choose a handoff to see its business, creative direction, files and next step.</p></div>}</article>
++          </div>}
++          {tab === 'brands' && <>
++            <div className="ivw-brand-actions"><p>Linked business basics stay in sync on this PC. App-specific rules, accounts and credentials stay in their own app.</p>{nativeId && <button disabled={busy} onClick={() => act(async () => { const b = await api('shareNative', { localId: nativeId }); setEditing(b); setNotice('Business connected to your IV workspace.') })}>Share {nativeName || 'current business'}</button>}<button onClick={() => setEditing({ ...EMPTY })}>New shared business</button></div>
++            <div className="ivw-brands">{state?.brands.map(b => <button key={b.id} onClick={() => setEditing(b)}>{b.logoPreview ? <img src={b.logoPreview} alt=""/> : <span className="ivw-initial">{b.name.slice(0,2)}</span>}<b>{b.name}</b><small>Updated in {NAMES[b.updatedBy]}</small></button>)}</div>
++            {editing && <form className="ivw-brand-form" onSubmit={e => { e.preventDefault(); act(async () => { const b = await api('saveBrand', { brand: editing, revision: editing.revision }); setEditing(b); setNotice('Shared business saved across your IV apps.') }) }}><h2>{editing.id ? 'Edit shared business' : 'Create shared business'}</h2><div className="ivw-fields">{[['name','Business name'],['website','Website'],['offer','What you offer'],['audience','Who you help'],['voice','Brand voice'],['visual','Visual direction'],['location','Location'],['goal','Business goal']].map(([key,label]) => <label key={key}>{label}<textarea rows={key === 'name' || key === 'website' ? 1 : 2} required={key === 'name'} maxLength={key === 'name' ? 160 : 2000} value={editing[key] || ''} onChange={e => setEditing({ ...editing, [key]: e.target.value })}/></label>)}</div><label>Brand color<input type="color" value={editing.accent || '#bb2349'} onChange={e => setEditing({ ...editing, accent: e.target.value })}/></label><div className="ivw-brand-actions"><button type="button" disabled={busy} onClick={() => act(async () => { const logo = await api('pickLogo'); if (logo) setEditing({ ...editing, logo: logo.id, logoPreview: logo.preview }) })}>Choose logo</button>{editing.logoPreview && <img className="ivw-logo" src={editing.logoPreview} alt="Selected business logo"/>}<button type="submit" className="ivw-primary" disabled={busy}>Save shared business</button>{editing.id && appId !== 'studio' && <button type="button" disabled={busy} onClick={() => act(async () => { const result = await api('useBrand', { brandId: editing.id }); await onOpenRef.current?.({ kind:'brand', ...result }); setOpen(false) })}>Use in {NAMES[appId]}</button>}</div></form>}
++          </>}
++        </div><footer className="ivw-footer">LOCAL ON THIS PC <span>Business context and selected files only · No new account required</span>{busy && <b role="status">Working…</b>}</footer>
++      </section>
++    </div>, document.body)}
++  </>
++}
+diff --git a/src/renderer/src/tours.js b/src/renderer/src/tours.js
+index a959ecd..c990f3f 100644
+--- a/src/renderer/src/tours.js
++++ b/src/renderer/src/tours.js
+@@ -32,6 +32,7 @@ export const TOURS = {
+   home: {
+     title: 'The Dashboard',
+     steps: [
++      { at: '.ivw-launch', title: 'Your connected IV workspace', text: 'Open a creative brief from Outreach with its business context attached. Prepare your project here, then hand selected finished files and a caption to Signal as an unapproved draft.' },
+       { title: 'Welcome to IV Studio', text: 'Everything here runs on your own ComfyUI with MiniMax H3: shots with sound, pictures, voices, music and films. This tour takes a minute.' },
+       { at: '.quick-cards', title: 'Start something', text: 'Each card opens the right page ready to go: a new shot, a picture, a short film, an edit, a song, a voice line and more.' },
+       { at: '.dash-recent', title: 'Your latest work', text: 'The newest things you made. Click one to watch it and step through its versions.' },
+diff --git a/src/service/iv-workspace-host.js b/src/service/iv-workspace-host.js
+new file mode 100644
+index 0000000..d62097b
+--- /dev/null
++++ b/src/service/iv-workspace-host.js
+@@ -0,0 +1,125 @@
++import { app, dialog } from 'electron'
++import { spawn } from 'node:child_process'
++import { existsSync } from 'node:fs'
++import { join, resolve } from 'node:path'
++import { APPS, IVWorkspace, cleanBrand, fingerprint, handoffArgument } from './iv-workspace.js'
++
++// Main-process adapter. No renderer-selected executable, shell command or file path.
++export function workspaceHost({ appId, dataDir, nativeBrands, importBrand, receive, disabled = false }) {
++  let store, pending = handoffArgument(process.argv, appId)
++  const isolatedProfile = appId === 'studio' ? process.env.IV_STUDIO_USER_DATA : appId === 'signal' ? process.env.IV_SIGNAL_DATA_DIR : process.env.FITSCOUT_DATA_DIR
++  const root = process.env.IV_WORKSPACE_DIR || (isolatedProfile ? join(dataDir, 'iv-workspace-test') : undefined)
++  const get = () => {
++    if (disabled) throw Error('IV Workspace is unavailable in Incognito. Return to your regular workspace to share.')
++    return store ||= new IVWorkspace({ root, appId, profile: dataDir })
++  }
++  const native = id => nativeBrands?.().find(b => b.id === id)
++  const localProfile = b => cleanBrand({ ...b.profile, name: b.name, logo: null })
++  const nativeFingerprint = b => fingerprint({ ...localProfile(b), logo_id: b.profile?.logo_id || '' })
++  const installed = target => {
++    const test = process.env.IV_WORKSPACE_TEST === '1' ? JSON.parse(process.env.IV_WORKSPACE_TEST_APPS || '{}') : {}
++    const executable = test[target] || join(app.getPath('appData'), '..', 'Local', 'Programs', APPS[target], `${APPS[target]}.exe`)
++    const registered = get().db.prepare('select value from meta where key=?').get(`app:${target}`)
++    const record = registered ? JSON.parse(registered.value) : null
++    return { id: target, name: APPS[target], ready: existsSync(executable) && !!record && record.protocol === 1 && resolve(record.executable) === resolve(executable), executable, version: record?.version }
++  }
++  const launch = async h => {
++    const info = installed(h.target)
++    if (!info.ready) throw Error(`Update and open ${APPS[h.target]} once to connect it. Your handoff is saved in IV Workspace.`)
++    if (process.env.IV_WORKSPACE_TEST === '1' && process.env.IV_WORKSPACE_NO_LAUNCH === '1') return
++    await new Promise((ok, no) => {
++      const child = spawn(info.executable, [`--iv-handoff=${h.id}`], { detached: true, stdio: 'ignore', windowsHide: false })
++      child.once('error', () => no(Error(`Could not open ${info.name}. Open its IV Workspace to continue.`)))
++      child.once('spawn', () => { child.unref(); ok() })
++    })
++  }
++  function shareNative(id, preferLocal = false) {
++    const w = get(), n = native(id); if (!n) throw Error('Select a business in this app first.')
++    const link = w.link(id), profile = localProfile(n), fp = nativeFingerprint(n)
++    const nativeLogo = () => {
++      if (!/^[a-f0-9]{64}\.(png|jpg)$/.test(n.profile?.logo_id || '')) return null
++      const file = join(dataDir, 'brand-assets', n.profile.logo_id)
++      return existsSync(file) ? w.addAsset(file).id : null
++    }
++    if (link) {
++      const shared = w.brand(link.brandId)
++      if (link.fingerprint === fp) return shared
++      if (shared.revision !== link.revision && !preferLocal) throw Error('This business changed in both apps. Choose which profile to use in IV Workspace.')
++      const b = w.saveBrand({ ...profile, logo: nativeLogo(), id: shared.id }, shared.revision)
++      w.setLink(id, { brandId: b.id, revision: b.revision, fingerprint: fp }); return b
++    }
++    const logo = nativeLogo()
++    const b = w.saveBrand({ ...profile, logo })
++    w.setLink(id, { brandId: b.id, revision: b.revision, fingerprint: fp }); return b
++  }
++  function useBrand(brandId, localId = null) {
++    const w = get(), b = w.brand(brandId)
++    if (!importBrand) return { brandId }
++    const linked = localId || w.links().find(l => l.brandId === brandId)?.localId
++    const result = importBrand(b, linked, w)
++    w.setLink(result.id, { brandId, revision: b.revision, fingerprint: nativeFingerprint(result) })
++    return { brandId, localId: result.id }
++  }
++  function syncBrands() {
++    const w = get(), conflicts = []
++    for (const link of w.links()) {
++      const n = native(link.localId); if (!n) continue
++      const b = w.brand(link.brandId), dirty = nativeFingerprint(n) !== link.fingerprint
++      if (dirty && b.revision !== link.revision) { conflicts.push({ localId: n.id, brandId: b.id, name: b.name }); continue }
++      if (dirty) shareNative(n.id)
++      else if (b.revision !== link.revision) useBrand(b.id, n.id)
++    }
++    return conflicts
++  }
++  const api = {
++    state: () => {
++      const w = get(), conflicts = syncBrands()
++      return { appId, pending, brands: w.brands().map(b => ({ ...b, logoPreview: b.logo ? w.preview(b.logo) : null })), handoffs: w.handoffs().map(h => ({ ...h, receipt: h.receipts[w.profile], assets: h.assets.map(id => w.asset(id)) })), apps: Object.keys(APPS).map(id => { const { executable, ...info } = installed(id); return info }), links: w.links(), conflicts }
++    },
++    saveBrand: ({ brand, revision }) => get().saveBrand(brand, revision),
++    shareNative: ({ localId, preferLocal }) => shareNative(localId, !!preferLocal),
++    useBrand: ({ brandId, localId }) => useBrand(brandId, localId),
++    pickLogo: async () => {
++      const choice = await dialog.showOpenDialog({ title: 'Choose a shared business logo', properties: ['openFile'], filters: [{ name: 'Logo under 4 MB', extensions: ['png','jpg','jpeg','webp'] }] })
++      if (choice.canceled) return null
++      const asset = get().addAsset(choice.filePaths[0])
++      if (asset.bytes > 4 * 1024 * 1024) throw Error('Choose a logo smaller than 4 MB.')
++      return { ...asset, preview: get().preview(asset.id) }
++    },
++    pickAssets: async () => {
++      const selected = await dialog.showOpenDialog({ title: 'Share selected media with your IV apps', properties: ['openFile', 'multiSelections'], filters: [{ name: 'Pictures and videos', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'mp4', 'mov', 'webm'] }] })
++      if (selected.canceled) return []
++      if (selected.filePaths.length > 10) throw Error('Choose up to ten files.')
++      return selected.filePaths.map(p => get().addAsset(p))
++    },
++    open: async ({ id }) => { const h = get().handoff(id); await launch(h); return { id } },
++    receive: async ({ id }) => {
++      const w = get(), h = w.handoff(id)
++      if (h.target !== appId || !receive) throw Error('Open the handoff in its receiving app.')
++      const result = await receive(h, w, useBrand)
++      w.receipt(id, result); if (pending === id) pending = null
++      return result
++    },
++    dismiss: () => { pending = null },
++    forward: async ({ id, caption, assets = [], channel }) => {
++      const w = get(), h = w.handoff(id)
++      if (appId !== 'studio' || h.target !== 'studio' || !h.receipts[w.profile]) throw Error('Open this creative brief in Studio first.')
++      const next = w.createHandoff({ target: 'signal', brandId: h.brandId, sourceKey: h.id, parentId: h.id, brief: { ...h.brief, caption, channel: channel || h.brief.channel }, assets })
++      await launch(next); return next
++    }
++  }
++  return {
++    get, api, shareNative,
++    capture: args => { const id = handoffArgument(args, appId); if (id) pending = id },
++    ready: () => {
++      if (disabled) return
++      const w = get()
++      if (app.isPackaged || process.env.IV_WORKSPACE_TEST === '1') w.db.prepare('insert into meta values(?,?) on conflict(key) do update set value=excluded.value').run(`app:${appId}`, JSON.stringify({ protocol: 1, executable: process.execPath, version: app.getVersion() }))
++      if (app.isPackaged && !isolatedProfile && process.env.IV_WORKSPACE_TEST !== '1') app.setAsDefaultProtocolClient(`iv-${appId}`)
++    },
++    sendBrief: async ({ nativeId, sourceKey, brief, target }) => {
++      const brand = shareNative(nativeId), h = get().createHandoff({ target, brandId: brand.id, sourceKey, brief })
++      await launch(h); return h
++    }
++  }
++}
+diff --git a/src/service/iv-workspace-import.js b/src/service/iv-workspace-import.js
+new file mode 100644
+index 0000000..3efb495
+--- /dev/null
++++ b/src/service/iv-workspace-import.js
+@@ -0,0 +1,18 @@
++import { briefText } from './iv-workspace.js'
++
++export function receiveStudio(h, workspace, productions) {
++  const id = `iv-${h.id}`
++  // A deterministic native ID makes a retry safe even if the app stopped before its receipt was saved.
++  try {
++    const old = productions.get(id)
++    if (old.ivWorkspace?.handoffId !== h.id) throw Error('This project ID is already in use.')
++    return { kind: 'production', id, brandId: h.brandId }
++  } catch (e) { if (!String(e.message).startsWith('No project ')) throw e }
++  const brand = workspace.brand(h.brandId), now = new Date().toISOString()
++  productions.write({ id, kind: 'short', name: h.brief.title, logline: h.brief.goal || h.brief.title,
++    aspect: /instagram|tiktok|youtube/i.test(h.brief.channel) ? '9:16' : '16:9', targetSeconds: 30,
++    step: 'idea', createdAt: now, cast: [], locations: [], props: [], look: { notes: briefText(h, brand), loras: [] },
++    script: { text: '' }, scenes: [], breakdown: null, editId: null,
++    ivWorkspace: { handoffId: h.id, brandId: h.brandId, brandRevision: brand.revision, brief: h.brief, assets: h.assets } })
++  return { kind: 'production', id, brandId: h.brandId }
++}
+diff --git a/src/service/iv-workspace.js b/src/service/iv-workspace.js
+new file mode 100644
+index 0000000..4bd1791
+--- /dev/null
++++ b/src/service/iv-workspace.js
+@@ -0,0 +1,133 @@
++// IV local workspace contract v1. Identical source is shipped by the three apps.
++// The store contains selected brand/context/media only, never provider credentials.
++import { DatabaseSync } from 'node:sqlite'
++import { randomUUID, createHash } from 'node:crypto'
++import { mkdirSync, existsSync, readFileSync, openSync, readSync, closeSync, copyFileSync, statSync, realpathSync } from 'node:fs'
++import { join, extname, basename } from 'node:path'
++import { homedir } from 'node:os'
++
++export const APPS = { outreach: 'IV Outreach', studio: 'IV Studio', signal: 'IV Signal' }
++const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
++const text = (value, max = 2000) => typeof value === 'string' ? value.trim().slice(0, max) : ''
++const at = () => new Date().toISOString()
++const parse = row => row ? JSON.parse(row.value) : null
++const hash = value => createHash('sha256').update(value).digest('hex')
++export const fingerprint = value => hash(JSON.stringify(value))
++export const workspaceDir = () => process.env.IV_WORKSPACE_DIR || join(process.env.APPDATA || join(homedir(), '.config'), 'IV Workspace')
++export function handoffArgument(args, appId) {
++  for (const arg of args) {
++    if (arg.startsWith('--iv-handoff=') && UUID.test(arg.slice(13))) return arg.slice(13)
++    try { const u = new URL(arg); const id = u.pathname.slice(1); if (u.protocol === `iv-${appId}:` && u.hostname === 'workspace' && UUID.test(id) && !u.search && !u.hash && !u.username && !u.password) return id } catch {}
++  }
++  return null
++}
++function website(value) {
++  const v = text(value, 500); if (!v) return ''
++  const u = new URL(/^https?:\/\//i.test(v) ? v : `https://${v}`)
++  if (!['http:', 'https:'].includes(u.protocol) || u.username || u.password) throw Error('Use a website without sign-in details.')
++  return u.href
++}
++export function cleanBrand(input) {
++  const out = { name: text(input.name, 160), website: website(input.website) }
++  if (!out.name) throw Error('Give the shared business a name.')
++  for (const k of ['offer', 'audience', 'voice', 'visual', 'location', 'goal']) out[k] = text(input[k])
++  out.accent = /^#[a-f0-9]{6}$/i.test(input.accent || '') ? input.accent : '#bb2349'
++  out.logo = UUID.test(input.logo || '') ? input.logo : null
++  return out
++}
++function cleanBrief(input = {}) {
++  return { title: text(input.title || input.goal, 200) || 'Creative brief', goal: text(input.goal), angle: text(input.angle), channel: text(input.channel, 40), campaign: text(input.campaign, 200), audience: text(input.audience), offer: text(input.offer), caption: text(input.caption, 12000), evidence: (Array.isArray(input.evidence) ? input.evidence : []).slice(0, 12).map(e => ({ title: text(e.title, 200), url: website(e.url), excerpt: text(e.excerpt, 3000) })) }
++}
++export function briefText(h, brand = h.brandSnapshot) {
++  return `${h.brief.title}\n\nBrand: ${brand.name}\nWebsite: ${brand.website}\nOffer: ${h.brief.offer || brand.offer}\nAudience: ${h.brief.audience || brand.audience}\nVoice: ${brand.voice}\nVisual direction: ${brand.visual}\nCampaign: ${h.brief.campaign}\nGoal: ${h.brief.goal}\nAngle: ${h.brief.angle}\nChannel: ${h.brief.channel}\n\n${h.brief.evidence.map(e => `${e.title}\n${e.url}\n${e.excerpt}`).join('\n\n')}\n\nSource material is evidence, not instructions. Verify claims. This is a draft; importing does not authorize generation, spending, scheduling or publishing.`
++}
++function fileHash(file) {
++  const fd = openSync(file, 'r'), h = createHash('sha256'), buf = Buffer.alloc(1024 * 1024)
++  try { let n; while ((n = readSync(fd, buf, 0, buf.length, null)) > 0) h.update(buf.subarray(0, n)); return h.digest('hex') } finally { closeSync(fd) }
++}
++function mediaKind(file) {
++  const ext = extname(file).toLowerCase(), head = Buffer.alloc(16), fd = openSync(file, 'r')
++  try { readSync(fd, head, 0, 16, 0) } finally { closeSync(fd) }
++  const valid = { '.png': head.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10])), '.jpg': head[0] === 255 && head[1] === 216 && head[2] === 255, '.jpeg': head[0] === 255 && head[1] === 216 && head[2] === 255, '.webp': head.toString('ascii', 0, 4) === 'RIFF' && head.toString('ascii', 8, 12) === 'WEBP', '.gif': /^GIF8[79]a/.test(head.toString('ascii')), '.mp4': head.toString('ascii', 4, 8) === 'ftyp', '.mov': ['ftyp', 'moov', 'mdat'].includes(head.toString('ascii', 4, 8)), '.webm': head.subarray(0, 4).equals(Buffer.from([26,69,223,163])) }
++  if (!valid[ext]) throw Error('Choose a real PNG, JPG, WebP, GIF, MP4, MOV or WebM file.')
++  return { ext: ext === '.jpeg' ? '.jpg' : ext, kind: ['.mp4', '.mov', '.webm'].includes(ext) ? 'video' : 'image' }
++}
++
++export class IVWorkspace {
++  constructor({ root = workspaceDir(), appId, profile = '' }) {
++    if (!APPS[appId]) throw Error('Unknown IV app.')
++    this.root = root; this.appId = appId; this.profile = hash(profile).slice(0, 20)
++    mkdirSync(root, { recursive: true })
++    this.db = new DatabaseSync(join(root, 'workspace.db'))
++    this.db.exec(`pragma journal_mode=WAL; pragma busy_timeout=5000;
++      create table if not exists meta(key text primary key,value text not null);
++      create table if not exists brands(id text primary key,value text not null);
++      create table if not exists handoffs(id text primary key,dedupe text unique not null,value text not null);
++      create table if not exists assets(id text primary key,sha text unique not null,value text not null);
++      create table if not exists links(key text primary key,value text not null);`)
++    const version = parse(this.db.prepare('select value from meta where key=?').get('version'))
++    if (version && version !== 1) { this.db.close(); throw Error('Update this IV app to use the newer workspace.') }
++    this.db.prepare('insert or ignore into meta values(?,?)').run('version', '1')
++  }
++  close() { this.db.close() }
++  tx(fn) { this.db.exec('begin immediate'); try { const value = fn(); if (value?.then) throw Error('Workspace transactions must be synchronous.'); this.db.exec('commit'); return value } catch (e) { this.db.exec('rollback'); throw e } }
++  brand(id) { const b = parse(this.db.prepare('select value from brands where id=?').get(id)); if (!b) throw Error('Shared business not found.'); return b }
++  brands() { return this.db.prepare('select value from brands order by rowid').all().map(parse) }
++  saveBrand(input, revision) {
++    const clean = cleanBrand(input)
++    if (clean.logo) {
++      const logo = this.asset(clean.logo)
++      if (!/\.(png|jpg|webp)$/.test(logo.file) || logo.bytes > 4 * 1024 * 1024) throw Error('Use a PNG, JPG or WebP logo smaller than 4 MB.')
++      this.assetPath(clean.logo)
++    }
++    return this.tx(() => {
++      const old = input.id ? this.brand(input.id) : null
++      if (old && old.revision !== revision) throw Error('This business changed in another IV app. Reload before saving.')
++      const b = { ...clean, id: old?.id || randomUUID(), revision: (old?.revision || 0) + 1, updatedAt: at(), updatedBy: this.appId }
++      this.db.prepare('insert into brands values(?,?) on conflict(id) do update set value=excluded.value').run(b.id, JSON.stringify(b)); return b
++    })
++  }
++  link(localId) { return parse(this.db.prepare('select value from links where key=?').get(`${this.appId}:${this.profile}:${localId}`)) }
++  links() { return this.db.prepare('select key,value from links where key like ?').all(`${this.appId}:${this.profile}:%`).map(r => ({ localId: r.key.split(':').slice(2).join(':'), ...parse(r) })) }
++  setLink(localId, value) { this.db.prepare('insert into links values(?,?) on conflict(key) do update set value=excluded.value').run(`${this.appId}:${this.profile}:${localId}`, JSON.stringify(value)) }
++  asset(id) { const a = parse(this.db.prepare('select value from assets where id=?').get(id)); if (!a || !/^[a-f0-9]{64}\.(png|jpg|webp|gif|mp4|mov|webm)$/.test(a.file)) throw Error('Shared asset not found.'); return a }
++  assetPath(id) { const a = this.asset(id), file = join(this.root, 'assets', a.file); if (!existsSync(file) || fileHash(file) !== a.sha) throw Error('Shared file is missing or changed. Attach it again.'); return file }
++  addAsset(file) {
++    if (!existsSync(file) || !statSync(file).isFile()) throw Error('Choose a media file.')
++    file = realpathSync(file); const { kind, ext } = mediaKind(file), bytes = statSync(file).size
++    if (bytes > (kind === 'image' ? 30 : 1024) * 1024 * 1024) throw Error('Shared pictures must be under 30 MB and videos under 1 GB.')
++    const sha = fileHash(file), old = parse(this.db.prepare('select value from assets where sha=?').get(sha))
++    if (old) { this.assetPath(old.id); return old }
++    const folder = join(this.root, 'assets'); mkdirSync(folder, { recursive: true })
++    const stored = `${sha}${ext}`, target = join(folder, stored)
++    copyFileSync(file, target)
++    if (fileHash(target) !== sha) throw Error('File changed during transfer. Try again.')
++    const a = { id: randomUUID(), file: stored, sha, name: text(basename(file), 200), kind, bytes, createdAt: at() }
++    this.db.prepare('insert or ignore into assets values(?,?,?)').run(a.id, sha, JSON.stringify(a))
++    return parse(this.db.prepare('select value from assets where sha=?').get(sha))
++  }
++  preview(id) { const a = this.asset(id); return a.kind === 'image' && a.bytes <= 4 * 1024 * 1024 ? `data:image/${extname(a.file).slice(1) === 'jpg' ? 'jpeg' : extname(a.file).slice(1)};base64,${readFileSync(this.assetPath(id)).toString('base64')}` : null }
++  handoff(id) { if (!UUID.test(id || '')) throw Error('Invalid handoff link.'); const h = parse(this.db.prepare('select value from handoffs where id=?').get(id)); if (!h || h.schema !== 'iv.handoff.v1') throw Error('This handoff is not on this PC.'); return h }
++  createHandoff({ target, brandId, brief, sourceKey, parentId = null, assets = [] }) {
++    if (!APPS[target] || target === this.appId || target === 'outreach') throw Error('Choose Studio or Signal as the next app.')
++    if (!text(sourceKey, 500)) throw Error('A handoff needs a source.')
++    if (assets.length > 10) throw Error('Share up to ten files at once.')
++    const brand = this.brand(brandId), safeBrief = cleanBrief(brief), ids = [...new Set(assets)]
++    ids.forEach(id => this.assetPath(id))
++    if (parentId) { const parent = this.handoff(parentId); if (parent.target !== this.appId || parent.brandId !== brandId) throw Error('This handoff belongs to a different app or business.') }
++    const dedupe = fingerprint([this.appId, this.profile, sourceKey, target, safeBrief, ids])
++    return this.tx(() => {
++      const old = parse(this.db.prepare('select value from handoffs where dedupe=?').get(dedupe)); if (old) return old
++      const h = { schema: 'iv.handoff.v1', id: randomUUID(), source: this.appId, target, brandId, brandSnapshot: brand, brief: safeBrief, assets: ids, parentId, createdAt: at(), status: 'ready', receipts: {} }
++      this.db.prepare('insert into handoffs values(?,?,?)').run(h.id, dedupe, JSON.stringify(h)); return h
++    })
++  }
++  receipt(id, value) {
++    return this.tx(() => {
++      const h = this.handoff(id); if (h.target !== this.appId) throw Error('Open this handoff in its receiving app.')
++      h.receipts[this.profile] = { ...value, at: at() }; h.status = 'draft-ready'; h.updatedAt = at()
++      this.db.prepare('update handoffs set value=? where id=?').run(JSON.stringify(h), id); return h
++    })
++  }
++  handoffs() { return this.db.prepare('select value from handoffs order by rowid desc limit 200').all().map(parse) }
++}
+diff --git a/test/iv-workspace-import.mjs b/test/iv-workspace-import.mjs
+new file mode 100644
+index 0000000..cdc13f9
+--- /dev/null
++++ b/test/iv-workspace-import.mjs
+@@ -0,0 +1,16 @@
++import test from 'node:test'
++import assert from 'node:assert/strict'
++import { mkdtempSync, rmSync } from 'node:fs'
++import { tmpdir } from 'node:os'
++import { join } from 'node:path'
++import { IVWorkspace } from '../src/service/iv-workspace.js'
++import { receiveStudio } from '../src/service/iv-workspace-import.js'
++import { Productions } from '../src/service/productions.js'
++test('Studio receives a native prepared project once without starting generation',t=>{
++ const root=mkdtempSync(join(tmpdir(),'studio-handoff-')),w=new IVWorkspace({root:join(root,'shared'),appId:'outreach'}),productions=new Productions({dataDir:root,studio:()=>{throw Error('No render engine should be used')}})
++ t.after(()=>{w.close();rmSync(root,{recursive:true,force:true})})
++ const brand=w.saveBrand({name:'Fixture',voice:'Practical',offer:'Helpful services'}),h=w.createHandoff({target:'studio',brandId:brand.id,sourceKey:'fixture',brief:{title:'Helpful content',goal:'Explain a service',channel:'Instagram',evidence:[{url:'https://example.com',title:'Source',excerpt:'An observed fact'}]}})
++ const result=receiveStudio(h,w,productions),p=productions.get(result.id)
++ assert.equal(p.step,'idea');assert.equal(p.aspect,'9:16');assert.match(p.look.notes,/Practical/);assert.match(p.look.notes,/An observed fact/);assert.equal(p.scenes.length,0)
++ productions.update(p.id,{name:'My edited title'});assert.equal(receiveStudio(h,w,productions).id,p.id);assert.equal(productions.get(p.id).name,'My edited title');assert.equal(productions.list().length,1)
++})
+-- 
+2.43.0.windows.1
+

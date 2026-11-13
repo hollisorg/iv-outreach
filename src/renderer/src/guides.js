@@ -1,5 +1,6 @@
 // Stable, named places shared by the visual guide and the agent. No arbitrary selectors from agents.
 export const PLACES = {
+  iv_workspace:{page:'today',selector:'.ivw-launch',title:'Continue across IV apps',text:'IV Workspace connects business profiles and creative handoffs locally. Prepare a brief in Outreach, create in Studio, then review an unapproved draft in Signal.'},
   opportunity:{page:'scanning',selector:'[data-guide="scan-opportunity"]',fallback:'.scanning-page',title:'Find a useful opportunity',text:'Choose Opportunity scan, pick a lead with a website, then review source evidence and Lighthouse findings. Free local scans do not spend IV credits or establish buying intent.'},
   watchlists:{page:'scanning',selector:'[data-guide="scan-watch"]',fallback:'.scanning-page',title:'Watch for a useful change',text:'Save a business page or RSS feed. Check now saves a baseline, then compares later content. It never sends a follow-up for you.'},
   content_briefs:{page:'scanning',selector:'[data-guide="scan-brief"]',fallback:'.scanning-page',title:'Create an IV content brief',text:'Combine your brand, campaign and evidence into a draft. Copy or export it for IV Studio and IV Signal, then review before creating or publishing.'},
@@ -19,7 +20,7 @@ export const PLACES = {
   boundaries:{page:'settings',selector:'#setup-boundaries',title:'Respect the no',text:'The do-not-contact list applies across all your businesses and campaigns. Any reply stops pending follow-ups.'},
 }
 export const GUIDES = {
-  today:['workspace','today','scanning','leads','approve','social','agent','sender','mailbox','premium','boundaries'],
+  today:['iv_workspace','workspace','today','scanning','leads','approve','social','agent','sender','mailbox','premium','boundaries'],
   scanning:['workspace','scanning','opportunity','watchlists','content_briefs','leads'],leads:['workspace','leads','approve'],approve:['approve','sender','mailbox'],social:['social','boundaries'],
   settings:['business_brand','business_profile','agent','premium','sender','mailbox','connections','boundaries'],
 }

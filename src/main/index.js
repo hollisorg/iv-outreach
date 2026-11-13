@@ -1,3 +1,4 @@
+import { workspaceHost } from '../service/iv-workspace-host.js'
 import { app, BrowserWindow, ipcMain, shell, clipboard, dialog, safeStorage, nativeImage } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { join, dirname } from 'node:path'
@@ -305,7 +306,27 @@ function chatEngine(engine) {
   return e
 }
 
+
+const ivWorkspace = workspaceHost({ appId: 'outreach', dataDir: fs.defaultDataDir(),
+  nativeBrands: () => fs.listBusinesses(getDb()),
+  importBrand: (brand, linkedId, workspace) => {
+    const db = getDb(), key = 'iv-workspace-brand:' + brand.id
+    const id = linkedId || fs.getSetting(db, key)
+    const existing = id ? fs.getBusiness(db, id) : null
+    const profile = Object.fromEntries(['website','offer','audience','voice','visual','location','goal','accent'].map(k => [k, brand[k]]))
+    profile.logo_id = brand.logo ? importBrandImage(fs.defaultDataDir(), workspace.assetPath(brand.logo), 'logo', nativeImage).id : ''
+    const result = tx(db, () => {
+      const b = existing ? fs.updateBusiness(db, existing.id, {name:brand.name,profile}) : fs.createBusiness(db, {name:brand.name,profile})
+      fs.setSetting(db, key, b.id); return b
+    })
+    send('data:changed', {tool:'ivWorkspaceBrand'}); return result
+  },
+
+})
+app.on('open-url', (event, url) => { event.preventDefault(); ivWorkspace.capture([url]) })
+
 const METHODS = {
+  ivWorkspace: ({method,args}) => { if (!Object.hasOwn(ivWorkspace.api, method)) throw Error('Unknown workspace action.'); return ivWorkspace.api[method](args || {}) },
   updatesStatus,
   updatesCheck: async () => { await appUpdates.check(); return updatesStatus() },
   updatesDownload: async () => { await appUpdates.download(); return updatesStatus() },
@@ -360,6 +381,7 @@ const METHODS = {
   contentBrief:args=>growth.contentBrief(getDb(),args),
   briefExport:async({campaign_id,id,format='markdown'})=>{const brief=growth.growthState(getDb(),campaign_id).briefs.find(b=>b.id===id);if(!brief)throw Error('Brief not found.');const json=format==='json';const pick=await dialog.showSaveDialog(win,{title:'Save IV content brief',defaultPath:`IV-Content-Brief-${id}.${json?'json':'md'}`,filters:[{name:json?'IV brief JSON':'Content brief',extensions:[json?'json':'md']}]});if(pick.canceled)return {saved:false};writeFileSync(pick.filePath,json?JSON.stringify(brief,null,2):growth.briefMarkdown(brief),'utf8');return {saved:true}},
   briefCopy:({campaign_id,id})=>{const brief=growth.growthState(getDb(),campaign_id).briefs.find(b=>b.id===id);if(!brief)throw Error('Brief not found.');clipboard.writeText(growth.briefMarkdown(brief));return true},
+  briefHandoff:async({campaign_id,id,target})=>{const campaign=fs.getCampaign(getDb(),campaign_id);if(!campaign)throw Error('Choose a campaign.');const brief=growth.growthState(getDb(),campaign_id).briefs.find(b=>b.id===id);if(!brief)throw Error('Brief not found.');return ivWorkspace.sendBrief({nativeId:campaign.business_id,sourceKey:brief.id,target,brief:{title:brief.goal,goal:brief.goal,angle:brief.angle,channel:brief.channel,campaign:brief.campaign.name,offer:brief.campaign.offer,audience:typeof brief.campaign.audience==='string'?brief.campaign.audience:JSON.stringify(brief.campaign.audience),evidence:brief.evidence}})},
   briefOpenApp:async({campaign_id,id,target})=>{if(!['studio','signal'].includes(target))throw Error('Choose IV Studio or IV Signal.');const name=target==='studio'?'IV Studio':'IV Signal',path=join(app.getPath('appData'),'..','Local','Programs',name,`${name}.exe`);if(!existsSync(path))throw Error(`${name} is not installed in the usual location. Use Copy brief instead.`);const brief=growth.growthState(getDb(),campaign_id).briefs.find(b=>b.id===id);if(!brief)throw Error('Brief not found.');clipboard.writeText(growth.briefMarkdown(brief));const error=await shell.openPath(path);if(error)throw Error(`Could not open ${name}. The brief is copied for manual paste.`);return {opened:true,copied:true,note:'Paste the brief into the app. Nothing was submitted automatically.'}},
   scannerSave:(args)=>fs.saveScan(getDb(),args),
   scannerRemove:({campaign_id,id})=>fs.removeScan(getDb(),campaign_id,id),
@@ -746,10 +768,12 @@ app.setPath('userData', fs.defaultDataDir())
 const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) app.quit()
 else {
-  app.on('second-instance', () => {
+  app.on('second-instance', (_event, args) => {
+    ivWorkspace.capture(args)
     if (win) { if (win.isMinimized()) win.restore(); win.focus() }
   })
   app.whenReady().then(async () => {
+    ivWorkspace.ready()
     createWindow()
     appUpdates = new AppUpdates({ updater: updaterPackage.autoUpdater, version: app.getVersion(), supported: app.isPackaged && process.platform === 'win32', onChange: () => send('updates:changed', updatesStatus()) })
     const checkUpdates = () => { if (readSettings().automaticUpdateChecks !== false) appUpdates.check().catch(() => {}) }

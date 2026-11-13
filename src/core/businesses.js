@@ -2,7 +2,7 @@ import { now, newId, logEvent } from './db.js'
 const hydrate = row => { if (!row) return null; const { profile_json, ...rest } = row; return { ...rest, profile: JSON.parse(profile_json || '{}') } }
 function cleanProfile(input = {}) {
   const profile = {}
-  for (const key of ['offer','audience','website','location','kind','goal','voice']) if (input[key] !== undefined) profile[key] = String(input[key] || '').trim().slice(0,1200)
+  for (const key of ['offer','audience','website','location','kind','goal','voice','visual']) if (input[key] !== undefined) profile[key] = String(input[key] || '').trim().slice(0,1200)
   for (const key of ['logo_id','cover_id']) if (input[key] !== undefined) {
     const value = String(input[key] || '')
     if (value && !/^[a-f0-9]{64}\.(png|jpg)$/.test(value)) throw new Error('Choose a business image from the app.')

@@ -1,3 +1,5 @@
+import IVWorkspace from './components/IVWorkspace'
+const ivWorkspaceApi = (method,args) => call('ivWorkspace',{method,args})
 import { useEffect, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { useData, call, on } from './api'
@@ -93,6 +95,7 @@ export default function App() {
           <Wordmark tone="light" />
         </div>
         <div className="titlebar-mid">
+          <IVWorkspace api={ivWorkspaceApi} appId="outreach" nativeId={business?.id} nativeName={business?.name} onOpen={async r => {if(r.kind==='brand'){setShowOnboarding(false);await reloadWorkspace();selectWorkspace(r.localId)}}} />
           <button className="help-launch" aria-label="How this works" title="Take a guided tour of this page" onClick={()=>startGuide(page)}><b aria-hidden="true">?</b><span>How this works</span><i className="help-beacon" aria-hidden="true"/></button>
           {['available', 'ready'].includes(update?.phase) && <button className="badge as-btn update-badge" onClick={() => { go('settings'); requestAnimationFrame(() => document.getElementById('setup-updates')?.scrollIntoView({block:'start'})) }}><span className="dot ok"/><span className="mono">{update.phase === 'ready' ? 'Update ready' : 'Update available'}</span></button>}
           <span className="badge" title={agent ? `The chat runs on your ${AGENT[agent]}` : 'No agent installed yet'}>

@@ -1,5 +1,7 @@
 # IV Outreach growth build
 
+This documents the 0.11.0 foundation. In 0.12.0, the copy/open handoff below is superseded by the local shared business and native draft integration in [IV Workspace](iv-workspace.md). Copy/export remain available as optional fallbacks.
+
 ## What is implemented
 
 Scanning now includes Opportunity scan, Premium discovery, Watchlists & news and Content briefs alongside Local markets, Agent research and Custom search. Personal Claude Code/Codex access and the existing free discovery tools remain independent of paid data providers.
