@@ -1,21 +1,42 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, screen } from 'electron'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { APPS } from '../../../src/service/iv-workspace.js'
 import { findHarnesses } from '../../../src/service/harness.js'
-import { appStatus, openApp, readWorkspace } from './workspace.js'
+import { TOOLS, appStatus, openApp, openTool, readWorkspace, toolStatus } from './workspace.js'
 import { createChat } from './chat.js'
 import { chatActions } from './actions.js'
 
 const directory = dirname(fileURLToPath(import.meta.url))
 let window
 let chat
-app.setName('Hivemind')
-if (process.env.HIVEMIND_DATA_DIR) app.setPath('userData', process.env.HIVEMIND_DATA_DIR)
+// The program is called IV Hivemind; its data stays in %APPDATA%\Hivemind so saved chats and settings carry over.
+app.setName('IV Hivemind')
+app.setPath('userData', process.env.HIVEMIND_DATA_DIR || join(app.getPath('appData'), 'Hivemind'))
+
+// Hivemind is a borderless, transparent overlay over the work area of one screen. Empty space lets the mouse
+// through to whatever is behind it; the renderer reports when the pointer is over a visible control.
+const overlayFile = () => join(app.getPath('userData'), 'overlay.json')
+function overlayPrefs() {
+  try { return JSON.parse(readFileSync(overlayFile(), 'utf8')) } catch { return {} }
+}
+function saveOverlayPrefs(next) {
+  try { writeFileSync(overlayFile(), JSON.stringify({ ...overlayPrefs(), ...next })) } catch {}
+}
+const cursorArea = () => screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea
+
+function coverArea(area = cursorArea()) {
+  if (!window || window.isDestroyed()) return
+  const now = window.getBounds()
+  if (now.x !== area.x || now.y !== area.y || now.width !== area.width || now.height !== area.height) window.setBounds(area)
+}
 
 function focusWindow() {
   if (!window || window.isDestroyed()) return
   if (window.isMinimized()) window.restore()
+  coverArea()
+  window.show()
   window.focus()
 }
 
@@ -43,8 +64,12 @@ function start() {
       return status
     })
     const engines = Object.entries(findHarnesses()).map(([id, path]) => ({ id, available: Boolean(path) }))
+    const tools = Object.keys(TOOLS).map(id => {
+      const { executable, ...status } = toolStatus(id, programs)
+      return status
+    })
     return {
-      apps, engines, problem,
+      apps, tools, engines, problem,
       brands: brands.map(({ id, name }) => ({ id, name })),
       handoffs: handoffs.map(item => ({
         id: item.id, source: item.source, target: item.target, brandId: item.brandId,
@@ -53,7 +78,7 @@ function start() {
       })),
     }
   })
-  handle('open-app', (id, handoffId) => openApp({ id, handoffId, programs }))
+  handle('open-app', (id, handoffId) => Object.hasOwn(TOOLS, id) && handoffId === undefined ? openTool({ id, programs }) : openApp({ id, handoffId, programs }))
   const actions = chatActions({ readWorkspace, openApp, appStatus, programs })
   const mcpScript = app.isPackaged ? join(process.resourcesPath, 'app.asar', 'out', 'main', 'mcp.js') : join(directory, 'mcp.js')
   const conversation = () => chat ||= createChat({ directory: join(app.getPath('userData'), 'chat'), workspace, emit: publish, actions, mcpScript })
@@ -62,15 +87,42 @@ function start() {
   handle('choose', (request) => conversation().choose(request))
   handle('stop', () => chat?.stop())
 
-  window = new BrowserWindow({
-    title: 'Hivemind', width: 1360, height: 900, minWidth: 740, minHeight: 620,
-    backgroundColor: '#121011', show: false, autoHideMenuBar: true,
-    titleBarStyle: 'hidden', titleBarOverlay: { color: '#131012', symbolColor: '#f3eae1', height: 44 },
-    webPreferences: { preload: join(directory, '../preload/index.cjs'), sandbox: true, contextIsolation: true, nodeIntegration: false },
+  handle('overlay', () => ({ pinned: Boolean(window.isAlwaysOnTop()) }))
+  handle('window', (action) => {
+    if (action === 'minimize') window.minimize()
+    else if (action === 'quit') app.quit()
+    else if (action === 'pin' || action === 'unpin') {
+      window.setAlwaysOnTop(action === 'pin', 'floating')
+      saveOverlayPrefs({ pinned: action === 'pin' })
+    } else throw new Error('Unknown window action.')
+    return { pinned: Boolean(window.isAlwaysOnTop()) }
   })
+  ipcMain.on('hivemind:solid', (event, solid) => {
+    if (!window || window.isDestroyed() || event.sender !== window.webContents) return
+    if (solid) window.setIgnoreMouseEvents(false)
+    else window.setIgnoreMouseEvents(true, { forward: true })
+  })
+
+  const area = cursorArea()
+  window = new BrowserWindow({
+    title: 'IV Hivemind', ...area,
+    transparent: true, frame: false, backgroundColor: '#00000000', hasShadow: false, roundedCorners: false,
+    resizable: false, maximizable: false, fullscreenable: false, thickFrame: false,
+    show: false, autoHideMenuBar: true,
+    webPreferences: { preload: join(directory, '../preload/index.cjs'), sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false },
+  })
+  window.setIgnoreMouseEvents(true, { forward: true })
+  if (overlayPrefs().pinned) window.setAlwaysOnTop(true, 'floating')
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   window.webContents.on('will-navigate', event => event.preventDefault())
   window.once('ready-to-show', () => window.show())
+  // Keep covering the screen if the taskbar, resolution or monitor layout changes.
+  const refit = () => {
+    const bounds = window.getBounds()
+    coverArea(screen.getDisplayMatching(bounds).workArea)
+  }
+  screen.on('display-metrics-changed', refit)
+  screen.on('display-removed', refit)
   if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) window.loadURL(process.env.ELECTRON_RENDERER_URL)
   else window.loadFile(join(directory, '../renderer/index.html'))
 }

@@ -38,6 +38,27 @@ export function appStatus(id, programs, registrations) {
   return { id, name, executable, installed, connected }
 }
 
+// Other IV apps Hivemind can open. They don't take part in the shared workspace or handoffs; Hivemind only
+// launches them from their standard per-user install folder.
+export const TOOLS = { chat: 'IV Chat', voice: 'IV Voice', keys: 'IV Keys' }
+
+export function toolStatus(id, programs) {
+  if (!Object.hasOwn(TOOLS, id)) throw new Error('Unknown IV app.')
+  const name = TOOLS[id]
+  const executable = join(programs, name, `${name}.exe`)
+  return { id, name, executable, installed: statSync(executable, { throwIfNoEntry: false })?.isFile() ?? false }
+}
+
+export async function openTool({ id, programs }) {
+  const target = toolStatus(id, programs)
+  if (!target.installed) throw new Error(`${target.name} is unavailable in the standard install folder.`)
+  await new Promise((accept, reject) => {
+    const child = spawn(target.executable, [], { detached: true, stdio: 'ignore', windowsHide: false })
+    child.once('error', () => reject(new Error(`Could not open ${target.name}.`)))
+    child.once('spawn', () => { child.unref(); accept() })
+  })
+}
+
 export async function openApp({ id, handoffId, programs, root }) {
   const workspace = handoffId === undefined ? null : readWorkspace(root)
   const target = appStatus(id, programs, workspace?.registrations || {})

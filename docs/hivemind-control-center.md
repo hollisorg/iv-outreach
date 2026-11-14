@@ -1,11 +1,26 @@
 # Hivemind control center direction
 
-Hivemind is a standalone Windows app for opening IV Outreach, IV Studio, and IV Signal. The white IV eye opens a shared chat. The business picker filters saved handoffs, and each handoff opens in its receiving app. The chat uses an installed Claude Code or Codex session for planning and drafting with the selected workspace context.
+Hivemind is a standalone Windows app for opening IV Outreach, IV Studio and IV Signal, plus IV Chat, IV Voice and IV Keys. The white IV eye opens a shared chat. The business picker filters saved handoffs, and each handoff opens in its receiving app. The chat uses an installed Claude Code or Codex session for planning and drafting with the selected workspace context.
+
+## Desktop overlay (0.3.0) and the name IV Hivemind (0.3.1), 2026-11-14
+
+The program is called **IV Hivemind**: installer `IV-Hivemind-Setup-<version>.exe`, folder `%LOCALAPPDATA%\Programs\IV Hivemind`, `IV Hivemind.exe`, shortcuts and window title "IV Hivemind". The app ID (`org.hollis.hivemind`) and the data folder `%APPDATA%\Hivemind` are unchanged, so installing 0.3.1 replaced the old "Hivemind" install and kept its data. Its icon is a coral brain in the IV app style (`apps/hivemind/build/icon.ico`).
+
+Hivemind has no window frame. It is a transparent, borderless window covering the work area of the screen the mouse is on, so the eye, the app menu, the dock bar and the side panel float on the desktop.
+
+- Click-through: the renderer marks every visible control `data-solid` and tells the main process whether the pointer is over one (`hivemind:solid`); everywhere else `setIgnoreMouseEvents(true, { forward: true })` lets the mouse through to the window behind. Checked with Windows' own `WindowFromPoint`.
+- Menu: six tiles fan out above the eye. Outreach, Studio and Signal (the workspace apps) sit in the middle; IV Chat, IV Voice and IV Keys sit on the ends and only launch (`TOOLS` in `main/workspace.js`; they take no handoffs).
+- Dock bar under the eye: business picker, Handoffs (with a count), Keep on top (remembered in `overlay.json`), Minimize and Close. Drag the eye to move the whole dock; its place is remembered.
+- The eye opens a dark glass panel on the side with more room, with Chat and Handoffs tabs. Esc closes it. Enter sends; Shift+Enter adds a line.
+- Motion: the eye fades in, the tiles spring out from it and drift, threads flow to them, the panel slides in from the eye's side. Reduced motion turns all of it off.
+- If the screen layout changes, the window refits to its display. Launching Hivemind again moves it to the screen the mouse is on.
+
+Check: `docs/verification/hivemind/overlay-check.mjs <win.ps1 helper> [--packaged]` drives the real desktop (it moves the mouse and takes screen captures, so run it only when nobody is using the PC, and don't keep the captures if other apps are on screen).
 
 ## Interaction
 
-- The wheel opens each app from its standard per-user Windows install location. An unavailable app is labeled in the wheel.
-- The eye opens chat while keeping the three app buttons within reach. Keyboard activation and reduced motion are supported.
+- The menu opens each app from its standard per-user Windows install location. An unavailable app is labeled.
+- The eye opens chat while keeping the app tiles within reach. Keyboard activation and reduced motion are supported.
 - The handoff list reads the shared workspace. Opening a handoff invokes its receiving app, where the existing receipt rules resolve the project or draft.
 - Chat saves conversations locally by business and agent. Each request includes the selected business context, recent handoff summaries, and a bounded conversation history. The agent can reopen an existing handoff (below); for anything else, use the app buttons and handoff links.
 
