@@ -1,4 +1,4 @@
-﻿# IV Outreach: agent context
+# IV Outreach: agent context
 
 Current name: **IV Outreach**. Version 0.3.0 uses native public-source research driven by the user's Claude Code or
 Codex login. No separate provider engine/API key is required. Original IV Studio family eye artwork remains.
