@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import logo from '../../../src/renderer/src/assets/hivemind-logo.png'
+import chatIcon from './app-icons/chat.png'
+import outreachIcon from './app-icons/outreach.png'
+import studioIcon from './app-icons/studio.png'
+import signalIcon from './app-icons/signal.png'
+import voiceIcon from './app-icons/voice.png'
+import keysIcon from './app-icons/keys.png'
 import './styles.css'
 
 // Hivemind floats on the desktop: a transparent, borderless overlay. Everything the person can see or click carries
@@ -9,19 +15,19 @@ const api = window.hivemind
 const appNames = { outreach: 'Outreach', studio: 'Studio', signal: 'Signal', chat: 'Chat', voice: 'Voice', keys: 'Keys' }
 // The menu fans out above the eye: the three workspace apps in the middle, the other IV apps on the ends.
 const appDetails = {
-  chat: { action: 'Ask anything', mark: '❝', angle: -170 },
-  outreach: { action: 'Research leads', mark: '⌖', angle: -138 },
-  studio: { action: 'Create media', mark: '◫', angle: -106 },
-  signal: { action: 'Draft posts', mark: '≋', angle: -74 },
-  voice: { action: 'Dictate', mark: '∿', angle: -42 },
-  keys: { action: 'Lock keys', mark: '⌨', angle: -10 },
+  chat: { icon: chatIcon, angle: -170, line: 'All your messages', detail: 'WhatsApp, Messenger, Instagram, LinkedIn and Telegram in one window, with AI drafting replies you send.' },
+  outreach: { icon: outreachIcon, angle: -138, line: 'Find new customers', detail: 'Finds businesses that fit your offer, researches them and drafts outreach you approve before anything goes out.' },
+  studio: { icon: studioIcon, angle: -106, line: 'Make AI video', detail: 'Make shots, short films, pictures, voices and music with AI on your own PC.' },
+  signal: { icon: signalIcon, angle: -74, line: 'Plan social posts', detail: 'Write a post once with a version for each network, approve it and schedule it.' },
+  voice: { icon: voiceIcon, angle: -42, line: 'Talk to type', detail: 'Dictate into any app, with Whisper running on your own graphics card.' },
+  keys: { icon: keysIcon, angle: -10, line: 'Keyboard & family', detail: 'An on-screen keyboard and a family control center for this PC.' },
 }
 const menuOrder = ['chat', 'outreach', 'studio', 'signal', 'voice', 'keys']
 const engines = { claude: 'Claude Code', codex: 'Codex' }
 const empty = { apps: [], tools: [], engines: [], brands: [], handoffs: [] }
 const dockKey = 'hivemind.dock'
-const orbitRadius = 222
-const panelGap = 300
+const orbitRadius = 240
+const panelGap = 320
 
 for (const href of [
   new URL('../../../src/renderer/src/assets/licenses/Barlow-Condensed-OFL.txt', import.meta.url).href,
@@ -70,20 +76,51 @@ function useClickThrough(holding) {
   }, [holding])
 }
 
-function AppOrb({ app, launch, opening, index }) {
+// A menu tile. Installed apps open; a missing app shows greyed out and offers to install it.
+function AppOrb({ app, launch, opening, index, onMissing, progress }) {
   const detail = appDetails[app.id]
   const radians = detail.angle * Math.PI / 180
   const dx = Math.round(Math.cos(radians) * orbitRadius)
   const dy = Math.round(Math.sin(radians) * orbitRadius)
+  const missing = !app.installed
+  const badge = missing ? (app.installable ? 'Get' : app.id === 'outreach' ? 'Private' : 'Soon') : null
   return (
-    <div className={`orb-slot slot-${app.id}${app.tool ? ' tool-slot' : ''}`} style={{ '--dx': `${dx}px`, '--dy': `${dy}px`, '--i': index }}>
+    <div className={`orb-slot slot-${app.id}${app.tool ? ' tool-slot' : ''}${missing ? ' missing' : ''}`} style={{ '--dx': `${dx}px`, '--dy': `${dy}px`, '--i': index }}>
       <button className={`app-orb node-${app.id}`} type="button" data-solid
-        aria-label={`Open ${app.name}`} disabled={!app.installed || opening}
-        title={app.installed ? `${app.name}: ${detail.action}` : `${app.name} is unavailable in the standard install folder.`}
-        onClick={() => launch(app.id)}>
-        <span className="app-symbol" aria-hidden="true">{detail.mark}</span>
-        <span className="app-label"><strong>{appNames[app.id]}</strong><small>{app.installed ? detail.action : 'Unavailable'}</small></span>
+        aria-label={missing ? `Get ${app.name}` : `Open ${app.name}`} disabled={opening && !missing}
+        title={missing ? `${app.name} isn't installed. ${detail.detail}` : `${app.name}: ${detail.detail}`}
+        onClick={() => missing ? onMissing(app) : launch(app.id)}>
+        <img className="app-icon" src={detail.icon} alt="" draggable="false" />
+        <span className="app-label"><strong>{appNames[app.id]}</strong><small>{detail.line}</small></span>
+        {badge && <span className={`app-badge${app.installable ? ' get' : ''}`}>{badge}</span>}
+        {progress && <span className="app-progress" aria-hidden="true"><i style={{ width: `${progress.percent || 0}%` }} /></span>}
       </button>
+    </div>
+  )
+}
+
+// The prompt that appears when a missing app is picked: what it is, where it comes from, and Install.
+function InstallCard({ app, release, state, onInstall, onPage, onClose }) {
+  const detail = appDetails[app.id]
+  const size = release?.size ? `about ${Math.round(release.size / 1048576)} MB` : 'the installer'
+  const busy = state && !state.done && !state.failed
+  return (
+    <div className="install-card" role="dialog" aria-label={`Get ${app.name}`} data-solid>
+      <img src={detail.icon} alt="" />
+      <div className="install-body">
+        <strong>{state?.done ? (state.installed ? `${app.name} is installed` : `${app.name} checked`) : `Get ${app.name}`}</strong>
+        <p>{detail.detail}</p>
+        {app.installable && !state && <p className="install-note">Downloads {size}{release?.version ? ` (version ${release.version})` : ''} from Infinite Variance on GitHub, checks it, and installs it just for you. Nothing else changes.</p>}
+        {!app.installable && <p className="install-note">{app.note}</p>}
+        {busy && <div className="install-progress" role="status"><span>{state.stage}{state.stage === 'Downloading' ? ` ${state.percent}%` : '…'}</span><i style={{ width: `${state.percent || 0}%` }} /></div>}
+        {state?.done && <p className="install-note">{state.installed ? `Version ${state.version}. It's opening now and is ready in the menu.` : `Version ${state.version} downloaded and checked (test mode: not installed).`}</p>}
+        {state?.failed && <p className="install-error" role="alert">{state.failed}</p>}
+        <div className="install-actions">
+          {app.installable && !busy && !state?.done && <button type="button" className="primary" onClick={onInstall}>{state?.failed ? 'Try again' : 'Install'}</button>}
+          {!app.installable && app.page && <button type="button" className="primary" onClick={onPage}>Open its page</button>}
+          {!busy && <button type="button" className="quiet" onClick={onClose}>{state?.done ? 'Done' : 'Not now'}</button>}
+        </div>
+      </div>
     </div>
   )
 }
@@ -274,6 +311,9 @@ function App() {
   const [pinned, setPinned] = useState(false)
   const [dock, setDock] = useState(readDock)
   const [dragging, setDragging] = useState(false)
+  const [picked, setPicked] = useState(null)
+  const [latest, setLatest] = useState(null)
+  const [installs, setInstalls] = useState({})
   const holding = useRef(false)
   const drag = useRef(null)
   const engineChosen = useRef(false)
@@ -314,10 +354,34 @@ function App() {
   }, [])
 
   useEffect(() => {
-    const key = event => { if (event.key === 'Escape') closePanel() }
+    const key = event => {
+      if (event.key !== 'Escape') return
+      const busy = picked && installs[picked] && !installs[picked].done && !installs[picked].failed
+      if (picked && !busy) setPicked(null)
+      else closePanel()
+    }
     window.addEventListener('keydown', key)
     return () => window.removeEventListener('keydown', key)
-  }, [closePanel])
+  }, [closePanel, picked, installs])
+
+  // Install progress from the main process; a finished install refreshes the menu so the tile lights up.
+  useEffect(() => {
+    const stop = api.onInstall(state => {
+      setInstalls(previous => ({ ...previous, [state.id]: state }))
+      if (state.done) refresh()
+    })
+    return stop
+  }, [refresh])
+
+  function pickMissing(app) {
+    setPicked(app.id)
+    setLatest(null)
+    if (app.installable) api.release(app.id).then(setLatest).catch(() => {})
+  }
+  async function install(id) {
+    setInstalls(previous => ({ ...previous, [id]: { id, stage: 'Starting', percent: 0 } }))
+    try { await api.install(id) } catch {}
+  }
 
   useEffect(() => { if (!problem) return; const timer = setTimeout(() => setProblem(''), 9000); return () => clearTimeout(timer) }, [problem])
 
@@ -381,8 +445,9 @@ function App() {
   }
 
   const menu = menuOrder.map(id => data.apps.find(app => app.id === id) || data.tools?.find(tool => tool.id === id) && { ...data.tools.find(tool => tool.id === id), tool: true }).filter(Boolean)
-  const cx = clamp(dock.x * width, 300, width - 300)
-  const cy = clamp(dock.y * height, 310, height - 160)
+  const pickedApp = picked ? menu.find(app => app.id === picked) : null
+  const cx = clamp(dock.x * width, 330, width - 330)
+  const cy = clamp(dock.y * height, 340, height - 330)
   const side = cx > width / 2 ? 'left' : 'right'
   const panelWidth = Math.min(460, Math.max(320, (side === 'left' ? cx : width - cx) - panelGap - 24))
   const panelLeft = side === 'left' ? Math.max(16, cx - panelGap - panelWidth) : Math.min(width - panelWidth - 16, cx + panelGap)
@@ -408,7 +473,11 @@ function App() {
             return <line key={app.id} className={`thread${app.tool ? ' faint' : ''}`} x1="0" y1="-10" x2={Math.cos(radians) * (orbitRadius - 58)} y2={Math.sin(radians) * (orbitRadius - 58) - 20} stroke="url(#thread)" />
           })}
         </svg>
-        {menu.map((app, index) => <AppOrb key={app.id} app={app} launch={launch} opening={opening} index={index} />)}
+        {menu.map((app, index) => {
+          const state = installs[app.id]
+          const busy = state && !state.done && !state.failed
+          return <AppOrb key={app.id} app={app} launch={launch} opening={opening} index={index} onMissing={pickMissing} progress={busy ? state : null} />
+        })}
         <button className={`agent-eye${panel === 'chat' ? ' active' : ''}`} type="button" data-solid aria-label="Open Hivemind chat"
           aria-expanded={panel === 'chat'} title="Ask Hivemind · drag to move"
           onPointerDown={grab} onPointerMove={move} onPointerUp={release} onPointerCancel={release} onClick={eyeClick}>
@@ -437,7 +506,10 @@ function App() {
             </button>
           </span>
         </div>
-        {problem && <p className="toast" role="alert" data-solid onClick={() => setProblem('')}>{problem}</p>}
+        {pickedApp && <InstallCard app={pickedApp} release={latest} state={installs[pickedApp.id]}
+          onInstall={() => install(pickedApp.id)} onPage={() => api.openPage(pickedApp.id).catch(error => setProblem(error.message))}
+          onClose={() => setPicked(null)} />}
+        {problem && <p className={`toast${pickedApp ? ' below-card' : ''}`} role="alert" data-solid onClick={() => setProblem('')}>{problem}</p>}
       </div>
 
       {panel && (

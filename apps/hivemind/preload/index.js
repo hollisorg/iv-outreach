@@ -8,6 +8,14 @@ contextBridge.exposeInMainWorld('hivemind', {
   choose: (request) => ipcRenderer.invoke('hivemind:choose', request),
   stop: () => ipcRenderer.invoke('hivemind:stop'),
   overlay: () => ipcRenderer.invoke('hivemind:overlay'),
+  install: (id) => ipcRenderer.invoke('hivemind:install', id),
+  release: (id) => ipcRenderer.invoke('hivemind:release', id),
+  openPage: (id) => ipcRenderer.invoke('hivemind:open-page', id),
+  onInstall: (listener) => {
+    const receive = (_event, state) => listener(state)
+    ipcRenderer.on('hivemind:install', receive)
+    return () => ipcRenderer.removeListener('hivemind:install', receive)
+  },
   windowAction: (action) => ipcRenderer.invoke('hivemind:window', action),
   setSolid: (solid) => ipcRenderer.send('hivemind:solid', Boolean(solid)),
   onChat: (listener) => {

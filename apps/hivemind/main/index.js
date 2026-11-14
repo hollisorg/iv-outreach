@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, screen } from 'electron'
+import { app, BrowserWindow, ipcMain, screen, shell } from 'electron'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -7,6 +7,7 @@ import { findHarnesses } from '../../../src/service/harness.js'
 import { TOOLS, appStatus, openApp, openTool, readWorkspace, toolStatus } from './workspace.js'
 import { createChat } from './chat.js'
 import { chatActions } from './actions.js'
+import { CATALOG, installApp, installInfo, latestRelease } from './install.js'
 
 const directory = dirname(fileURLToPath(import.meta.url))
 let window
@@ -41,7 +42,9 @@ function focusWindow() {
 }
 
 function start() {
-  const programs = join(app.getPath('appData'), '..', 'Local', 'Programs')
+  // HIVEMIND_PROGRAMS_DIR points a test copy at another folder (for example an empty one, to see apps as not installed).
+  const programs = process.env.HIVEMIND_PROGRAMS_DIR || join(app.getPath('appData'), '..', 'Local', 'Programs')
+  let installing = null
   const workspace = () => readWorkspace()
   const publish = (state) => {
     if (window && !window.isDestroyed()) window.webContents.send('hivemind:chat', state)
@@ -61,12 +64,12 @@ function start() {
     const { brands, handoffs, registrations } = state
     const apps = Object.keys(APPS).map(id => {
       const { executable, ...status } = appStatus(id, programs, registrations)
-      return status
+      return { ...status, ...installInfo(id) }
     })
     const engines = Object.entries(findHarnesses()).map(([id, path]) => ({ id, available: Boolean(path) }))
     const tools = Object.keys(TOOLS).map(id => {
       const { executable, ...status } = toolStatus(id, programs)
-      return status
+      return { ...status, ...installInfo(id) }
     })
     return {
       apps, tools, engines, problem,
@@ -79,6 +82,42 @@ function start() {
     }
   })
   handle('open-app', (id, handoffId) => Object.hasOwn(TOOLS, id) && handoffId === undefined ? openTool({ id, programs }) : openApp({ id, handoffId, programs }))
+
+  // Install a missing IV app the person picked from the menu, then open it once so it connects to the workspace.
+  // HIVEMIND_INSTALL_DRYRUN=1 downloads and checks the installer without running it.
+  const nameOf = id => APPS[id] || TOOLS[id]
+  const sendInstall = state => { if (window && !window.isDestroyed()) window.webContents.send('hivemind:install', state) }
+  handle('install', async (id) => {
+    if (!nameOf(id) || !CATALOG[id]) throw new Error('Unknown IV app.')
+    if (installing) throw new Error(`Wait for ${nameOf(installing)} to finish installing.`)
+    installing = id
+    const name = nameOf(id)
+    try {
+      const dryRun = process.env.HIVEMIND_INSTALL_DRYRUN === '1'
+      const result = await installApp({
+        id, name, programs, dryRun,
+        tempDir: join(app.getPath('temp'), 'iv-hivemind-installers'),
+        progress: state => sendInstall({ id, ...state }),
+      })
+      if (result.installed) {
+        sendInstall({ id, stage: `Opening ${name}`, percent: 100 })
+        try { await (Object.hasOwn(TOOLS, id) ? openTool({ id, programs }) : openApp({ id, programs })) } catch {}
+      }
+      sendInstall({ id, done: true, ...result })
+      return result
+    } catch (error) {
+      sendInstall({ id, failed: error.message })
+      throw error
+    } finally {
+      installing = null
+    }
+  })
+  handle('release', (id) => latestRelease(id))
+  handle('open-page', (id) => {
+    const page = CATALOG[id]?.page
+    if (!page || !/^https:\/\/github\.com\/hollisorg\//.test(page)) throw new Error('This app has no page yet.')
+    return shell.openExternal(page)
+  })
   const actions = chatActions({ readWorkspace, openApp, appStatus, programs })
   const mcpScript = app.isPackaged ? join(process.resourcesPath, 'app.asar', 'out', 'main', 'mcp.js') : join(directory, 'mcp.js')
   const conversation = () => chat ||= createChat({ directory: join(app.getPath('userData'), 'chat'), workspace, emit: publish, actions, mcpScript })
@@ -115,7 +154,8 @@ function start() {
   if (overlayPrefs().pinned) window.setAlwaysOnTop(true, 'floating')
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   window.webContents.on('will-navigate', event => event.preventDefault())
-  window.once('ready-to-show', () => window.show())
+  // HIVEMIND_HIDDEN=1 keeps a test copy off the screen (checks capture the page instead).
+  window.once('ready-to-show', () => { if (process.env.HIVEMIND_HIDDEN !== '1') window.show() })
   // Keep covering the screen if the taskbar, resolution or monitor layout changes.
   const refit = () => {
     const bounds = window.getBounds()
