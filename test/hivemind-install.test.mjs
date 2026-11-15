@@ -36,7 +36,9 @@ test('only apps with a public feed are installable', () => {
   assert.equal(installInfo('studio').installable, true)
   assert.equal(installInfo('signal').installable, true)
   assert.equal(installInfo('chat').installable, true)
-  for (const id of ['voice', 'keys', 'outreach']) assert.equal(installInfo(id).installable, false)
+  assert.equal(installInfo('downloader').installable, true)
+  assert.equal(installInfo('keys').installable, false)
+  for (const id of ['voice', 'outreach']) assert.equal(installInfo(id).installable, false)
   assert.match(installInfo('outreach').note, /private test/)
 })
 
@@ -73,4 +75,23 @@ test('a checked download installs; a tampered or oversized one never runs', asyn
   assert.equal(existsSync(join(tempDir, 'IV-Chat-Setup.exe')), false)
 
   await assert.rejects(installApp({ id: 'outreach', name: 'IV Outreach', programs: tempDir, tempDir, run }), /private test/)
+})
+
+test('the menu offers IV Downloader in place of IV Keys', async () => {
+  const { TOOLS } = await import('../apps/hivemind/main/workspace.js')
+  assert.deepEqual(TOOLS, { chat: 'IV Chat', voice: 'IV Voice', downloader: 'IV Downloader' })
+  assert.equal(CATALOG.downloader.feed, 'https://github.com/hollisorg/iv-downloader/releases/latest/download/')
+  assert.equal(CATALOG.keys, undefined)
+  // IV Downloader's latest.yml shape (0.2.2) reads like the other apps' feeds.
+  const real = `version: 0.2.2
+files:
+  - url: IV-Downloader-Setup.exe
+    sha512: ${'x'.repeat(86)}==
+    size: 211579007
+path: IV-Downloader-Setup.exe
+`
+  assert.deepEqual(parseFeed(real), { version: '0.2.2', file: 'IV-Downloader-Setup.exe', sha512: `${'x'.repeat(86)}==`, size: 211579007 })
+  const menu = await import('node:fs').then(fs => fs.readFileSync(new URL('../apps/hivemind/renderer/main.jsx', import.meta.url), 'utf8'))
+  assert.match(menu, /menuOrder = \['chat', 'outreach', 'studio', 'signal', 'voice', 'downloader'\]/)
+  assert.doesNotMatch(menu, /keysIcon|IV Keys/)
 })

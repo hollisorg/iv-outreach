@@ -53,7 +53,7 @@ export function appStatus(id, programs, registrations) {
 
 // Other IV apps Hivemind can open. They don't take part in the shared workspace or handoffs; Hivemind only
 // launches them from their standard per-user install folder.
-export const TOOLS = { chat: 'IV Chat', voice: 'IV Voice', keys: 'IV Keys' }
+export const TOOLS = { chat: 'IV Chat', voice: 'IV Voice', downloader: 'IV Downloader' }
 
 export function toolStatus(id, programs) {
   if (!Object.hasOwn(TOOLS, id)) throw new Error('Unknown IV app.')

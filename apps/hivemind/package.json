@@ -1,8 +1,8 @@
 {
   "name": "iv-hivemind",
   "productName": "IV Hivemind",
-  "version": "0.7.2",
-  "description": "The desktop overlay for IV Outreach, IV Studio, IV Signal, IV Chat, IV Voice and IV Keys.",
+  "version": "0.7.3",
+  "description": "The desktop overlay for IV Outreach, IV Studio, IV Signal, IV Chat, IV Voice and IV Downloader.",
   "author": "The Hollis Organization",
   "license": "UNLICENSED",
   "private": true,

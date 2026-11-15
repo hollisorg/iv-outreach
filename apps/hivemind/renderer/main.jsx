@@ -6,7 +6,7 @@ import outreachIcon from './app-icons/outreach.png'
 import studioIcon from './app-icons/studio.png'
 import signalIcon from './app-icons/signal.png'
 import voiceIcon from './app-icons/voice.png'
-import keysIcon from './app-icons/keys.png'
+import downloaderIcon from './app-icons/downloader.png'
 import { RichText } from './rich-text.jsx'
 import { BusinessSwitcher, Businesses } from './businesses.jsx'
 import './styles.css'
@@ -14,7 +14,7 @@ import './styles.css'
 // Hivemind floats on the desktop: a transparent, borderless overlay. Everything the person can see or click carries
 // data-solid; the main process lets the mouse through everywhere else.
 const api = window.hivemind
-const appNames = { outreach: 'Outreach', studio: 'Studio', signal: 'Signal', chat: 'Chat', voice: 'Voice', keys: 'Keys' }
+const appNames = { outreach: 'Outreach', studio: 'Studio', signal: 'Signal', chat: 'Chat', voice: 'Voice', downloader: 'Downloader' }
 // The menu fans out above the eye: the three workspace apps in the middle, the other IV apps on the ends.
 const appDetails = {
   chat: { icon: chatIcon, angle: -170, line: 'All your messages', detail: 'WhatsApp, Messenger, Instagram, LinkedIn and Telegram in one window, with AI drafting replies you send.' },
@@ -22,9 +22,9 @@ const appDetails = {
   studio: { icon: studioIcon, angle: -106, line: 'Make AI video', detail: 'Make shots, short films, pictures, voices and music with AI on your own PC.' },
   signal: { icon: signalIcon, angle: -74, line: 'Plan social posts', detail: 'Write a post once with a version for each network, approve it and schedule it.' },
   voice: { icon: voiceIcon, angle: -42, line: 'Talk to type', detail: 'Dictate into any app, with Whisper running on your own graphics card.' },
-  keys: { icon: keysIcon, angle: -10, line: 'Keyboard & family', detail: 'An on-screen keyboard and a family control center for this PC.' },
+  downloader: { icon: downloaderIcon, angle: -10, line: 'Save videos', detail: 'Download videos and audio from links to watch offline or use in your edits.' },
 }
-const menuOrder = ['chat', 'outreach', 'studio', 'signal', 'voice', 'keys']
+const menuOrder = ['chat', 'outreach', 'studio', 'signal', 'voice', 'downloader']
 const engines = { claude: 'Claude Code', codex: 'Codex' }
 const empty = { apps: [], tools: [], engines: [], brands: [], handoffs: [] }
 const dockKey = 'hivemind.dock'

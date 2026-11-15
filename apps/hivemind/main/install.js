@@ -11,7 +11,7 @@ export const CATALOG = {
   signal: { feed: 'https://github.com/hollisorg/iv-signal-releases/releases/latest/download/', page: 'https://github.com/hollisorg/iv-signal-releases/releases/latest' },
   chat: { feed: 'https://github.com/hollisorg/iv-chat/releases/latest/download/', page: 'https://github.com/hollisorg/iv-chat/releases/latest' },
   voice: { page: 'https://github.com/hollisorg/iv-voice', note: 'IV Voice has no public download yet.' },
-  keys: { page: 'https://github.com/hollisorg/iv-keys', note: 'IV Keys has no public download yet.' },
+  downloader: { feed: 'https://github.com/hollisorg/iv-downloader/releases/latest/download/', page: 'https://github.com/hollisorg/iv-downloader/releases/latest' },
   outreach: { note: 'IV Outreach is in a private test and can’t be downloaded yet.' },
 }
 
