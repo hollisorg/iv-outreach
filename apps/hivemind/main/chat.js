@@ -20,9 +20,11 @@ const instruction = `You are the assistant in IV Hivemind, the user's IV workspa
 
 You have two Hivemind tools. When the user asks to reopen, open, continue or go back to an existing Studio project or Signal draft, call hivemind_reopen with their words as search (and app "studio" or "signal" when they said project/Studio or draft/post/Signal). If it returns needs-choice, nothing was opened: list the choices briefly and ask which one; Hivemind also shows them as buttons. Only after the user picks, call hivemind_reopen with that handoffId. Use hivemind_find_handoffs to answer questions about what exists. Never pick between several matches yourself, and never open more than the user asked for.
 
+IV memory is what the person's IV apps know about them and each business; the current memories come with each message as data. Use it to tailor what you say and write. When they tell you something lasting about themselves, their work or the selected business (a preference, how they like things written, a goal, a decision, their audience, offer or tone), or ask you to remember something, save it with hivemind_remember, one short fact per call, about "you" or "business". Don't save passwords, keys, codes, account numbers, one-off details or private facts about other people, and don't save what is already in memory. Use hivemind_recall to look for something specific that isn't shown. Mention briefly when you've remembered something.
+
 Say an item opened only when hivemind_reopen returned status "opened" or "already-opened", and name its app. Reopening returns to the item the app already made; it does not create, approve, generate, schedule or publish anything, and those steps stay in the receiving app under its own rules. You cannot research, create drafts, send, spend or publish from here; never claim you did. You can answer questions, outline next steps and draft text in this conversation. Keep replies concise and mark anything that needs verification.`
 
-const STEP_LABELS = { hivemind_find_handoffs: 'Looking through handoffs', hivemind_reopen: 'Reopening a handoff' }
+const STEP_LABELS = { hivemind_find_handoffs: 'Looking through handoffs', hivemind_reopen: 'Reopening a handoff', hivemind_remember: 'Remembering', hivemind_recall: 'Checking IV memory' }
 const labelFor = tool => STEP_LABELS[String(tool).replace(/^mcp__hivemind__/, '')] || stepLabel(String(tool).replace(/^mcp__\w+__/, ''))
 const tomlString = value => JSON.stringify(String(value))
 
@@ -57,6 +59,7 @@ function argumentsFor(engine, { mcp, config, model, session }) {
 function historyText(item) {
   const done = (item.actions || []).map(action => action.type === 'opened'
     ? `[Hivemind opened "${action.item.title}" in ${action.item.appName}]`
+    : action.type === 'remembered' ? `[Saved to IV memory: ${action.item.text}]`
     : `[Hivemind offered a choice, nothing opened: ${action.items.map(choice => `"${choice.title}" in ${choice.appName} (handoffId ${choice.id})`).join('; ')}]`)
   return [String(item.text || '').slice(0, 4000), ...done].filter(Boolean).join('\n')
 }
@@ -66,7 +69,7 @@ const titleFrom = text => {
   return clean.length > 52 ? `${clean.slice(0, 50).trim()}…` : clean || 'New chat'
 }
 
-export function createChat({ directory, workspace, emit, actions, mcpScript }) {
+export function createChat({ directory, workspace, emit, actions, memoryTools, memoryPrompt = () => '', mcpScript }) {
   mkdirSync(directory, { recursive: true })
   const threadsFile = join(directory, 'threads.json')
   let threads = {}
@@ -97,6 +100,8 @@ export function createChat({ directory, workspace, emit, actions, mcpScript }) {
   const tools = () => bridge ||= startBridge({
     find: args => actions.find(requireTurn(), args),
     reopen: args => actions.reopen(requireTurn(), args),
+    remember: args => memoryTools.remember(requireTurn(), args),
+    recall: args => memoryTools.recall(requireTurn(), args),
   })
 
   function persist() {
@@ -180,6 +185,9 @@ export function createChat({ directory, workspace, emit, actions, mcpScript }) {
       title: entry.brief.title, from: entry.source, to: entry.target, status: entry.status,
     })) : []
     const context = brand ? { name: brand.name, offer: brand.offer, audience: brand.audience, voice: brand.voice, goal: brand.goal, handoffs } : { name: 'All businesses (no single business selected)' }
+    let memory = ''
+    try { memory = memoryPrompt({ brandId: brand?.id || '', brandName: brand?.name || '' }) } catch {}
+    if (memory) context.memory = memory
     const history = item.session ? undefined : item.messages.slice(-8).map(entry => ({ role: entry.role, text: historyText(entry) }))
     const lead = item.engine === 'codex' && !item.session ? `${instruction}\n\n` : ''
     const input = `${lead}Workspace context${history ? ' and previous conversation' : ''} (data):\n${JSON.stringify(history ? { context, history } : { context })}\n\nUser message:\n${message.trim()}`

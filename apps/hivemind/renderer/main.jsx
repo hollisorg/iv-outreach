@@ -131,7 +131,25 @@ const shortDate = value => {
 }
 
 // What Hivemind actually did during a reply, shown from its own record rather than the agent's wording.
+function RememberedCard({ item }) {
+  const [forgotten, setForgotten] = useState(false)
+  const [problem, setProblem] = useState('')
+  async function forget() {
+    try { await api.memoryRemove(item.id); setForgotten(true) }
+    catch (error) { if (/no longer/.test(error.message)) setForgotten(true); else setProblem(error.message) }
+  }
+  return (
+    <div className={`action-card remembered${forgotten ? ' forgotten' : ''}`} role="status">
+      <span className="action-kind"><span className="action-dot" aria-hidden="true" />{forgotten ? 'Forgotten' : `Remembered${item.about === 'business' && item.business ? ` for ${item.business}` : ''}`}</span>
+      <strong>{item.text}</strong>
+      {!forgotten && <small className="action-note">Every IV app chat can use this. <button type="button" className="link" onClick={forget}>Forget it</button></small>}
+      {problem && <small className="install-error">{problem}</small>}
+    </div>
+  )
+}
+
 function ActionCard({ action, onChoose, disabled }) {
+  if (action.type === 'remembered') return <RememberedCard item={action.item} />
   if (action.type === 'opened') {
     const { item } = action
     return (
@@ -398,6 +416,193 @@ function Chat({ brandId, available, defaultEngine, opening }) {
   )
 }
 
+function MemoryItem({ item, scopes, onChanged }) {
+  const [editing, setEditing] = useState(false)
+  const [text, setText] = useState(item.text)
+  const [problem, setProblem] = useState('')
+  async function save() {
+    try { await api.memoryUpdate(item.id, { text }); setEditing(false); setProblem(''); onChanged() }
+    catch (error) { setProblem(error.message) }
+  }
+  async function move(scope) {
+    try { await api.memoryUpdate(item.id, { scope }); onChanged() } catch (error) { setProblem(error.message) }
+  }
+  async function remove() {
+    if (!confirm(`Forget this?\n\n“${item.text}”`)) return
+    try { await api.memoryRemove(item.id); onChanged() } catch (error) { setProblem(error.message) }
+  }
+  return (
+    <li className="memory-item">
+      {editing
+        ? <textarea aria-label="Edit memory" value={text} maxLength="600" rows="2" onChange={event => setText(event.target.value)} />
+        : <p>{item.text}</p>}
+      <div className="memory-meta">
+        <small>{item.source}{item.by && item.by !== 'hivemind' ? ` · ${item.by}` : ''} · {shortDate(item.updatedAt)}</small>
+        <span className="memory-actions">
+          {editing
+            ? <><button type="button" className="link" onClick={save}>Save</button><button type="button" className="link" onClick={() => { setEditing(false); setText(item.text) }}>Cancel</button></>
+            : <>
+              {scopes.length > 1 && <select aria-label="Who it's about" value={item.scope} onChange={event => move(event.target.value)}>
+                {scopes.map(scope => <option key={scope.id} value={scope.id}>{scope.name}</option>)}
+              </select>}
+              <button type="button" className="link" onClick={() => setEditing(true)}>Edit</button>
+              <button type="button" className="link" onClick={remove}>Forget</button>
+            </>}
+        </span>
+      </div>
+      {problem && <small className="install-error">{problem}</small>}
+    </li>
+  )
+}
+
+function MemorySection({ title, scope, items, scopes, onChanged }) {
+  const [text, setText] = useState('')
+  const [problem, setProblem] = useState('')
+  async function add(event) {
+    event.preventDefault()
+    if (!text.trim()) return
+    try { await api.memoryAdd({ scope, text }); setText(''); setProblem(''); onChanged() }
+    catch (error) { setProblem(error.message) }
+  }
+  return (
+    <section className="memory-section" aria-label={title}>
+      <h3>{title} <span className="count">{items.length}</span></h3>
+      {!items.length && <p className="empty-note">Nothing yet. Tell Hivemind in chat, add one here, or import from your AI.</p>}
+      <ul>{items.map(item => <MemoryItem key={item.id} item={item} scopes={scopes} onChanged={onChanged} />)}</ul>
+      <form className="memory-add" onSubmit={add}>
+        <input aria-label={`Add a memory ${title.toLowerCase()}`} maxLength="600" placeholder="Add something to remember…" value={text} onChange={event => setText(event.target.value)} />
+        <button type="submit" className="quiet" disabled={!text.trim()}>Add</button>
+      </form>
+      {problem && <small className="install-error">{problem}</small>}
+    </section>
+  )
+}
+
+const sizeLabel = bytes => bytes > 1048576 ? `${(bytes / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`
+
+// Import what the person's own AI knows: their agent reads the files (or a pasted answer) and suggests memories,
+// which they tick, edit and file before anything is saved.
+function MemoryImport({ brands, available, defaultEngine, onDone, onCancel }) {
+  const [sources, setSources] = useState(null)
+  const [source, setSource] = useState('claude')
+  const [engine, setEngine] = useState(defaultEngine)
+  const [pasted, setPasted] = useState('')
+  const [copied, setCopied] = useState(false)
+  const [running, setRunning] = useState(false)
+  const [suggestions, setSuggestions] = useState(null)
+  const [problem, setProblem] = useState('')
+  const [saving, setSaving] = useState(false)
+  useEffect(() => { api.importSources().then(found => { setSources(found); if (!found.claude.count && found.codex.count) setSource('codex'); else if (!found.claude.count) setSource('paste') }).catch(error => setProblem(error.message)) }, [])
+  const scopes = [{ id: 'you', name: 'About you' }, ...brands.map(brand => ({ id: brand.id, name: brand.name }))]
+
+  async function run() {
+    setRunning(true); setProblem(''); setSuggestions(null)
+    try {
+      const result = await api.importRun({ source, engine, text: pasted })
+      setSuggestions(result.suggestions.map(item => ({ ...item, keep: true })))
+    } catch (error) { setProblem(error.message) }
+    finally { setRunning(false) }
+  }
+  async function save() {
+    setSaving(true); setProblem('')
+    let saved = 0
+    for (const item of suggestions.filter(entry => entry.keep)) {
+      try { await api.memoryAdd({ scope: item.scope, text: item.text, source: 'import' }); saved++ }
+      catch (error) { setProblem(error.message) }
+    }
+    setSaving(false)
+    onDone(saved)
+  }
+  const edit = (index, change) => setSuggestions(list => list.map((item, at) => at === index ? { ...item, ...change } : item))
+
+  if (suggestions) {
+    const kept = suggestions.filter(item => item.keep).length
+    return (
+      <div className="memory-import">
+        <h3>Suggested memories</h3>
+        <p className="install-note">{suggestions.length ? 'Untick anything you don’t want, fix the wording, and file each one under you or a business. Nothing is saved until you press Save.' : 'Nothing new to add: IV memory already has everything it suggested.'}</p>
+        <ul className="suggestions">
+          {suggestions.map((item, index) => (
+            <li key={index} className={item.keep ? '' : 'off'}>
+              <input type="checkbox" aria-label="Keep this memory" checked={item.keep} onChange={event => edit(index, { keep: event.target.checked })} />
+              <div>
+                <textarea aria-label="Memory text" rows="2" maxLength="600" value={item.text} onChange={event => edit(index, { text: event.target.value })} />
+                <select aria-label="Who it's about" value={item.scope} onChange={event => edit(index, { scope: event.target.value })}>
+                  {scopes.map(scope => <option key={scope.id} value={scope.id}>{scope.name}</option>)}
+                </select>
+              </div>
+            </li>
+          ))}
+        </ul>
+        {problem && <p className="install-error">{problem}</p>}
+        <div className="install-actions">
+          {suggestions.length > 0 && <button type="button" className="primary" disabled={!kept || saving} onClick={save}>{saving ? 'Saving…' : `Save ${kept}`}</button>}
+          <button type="button" className="quiet" disabled={saving} onClick={onCancel}>{suggestions.length ? 'Cancel' : 'Back'}</button>
+        </div>
+      </div>
+    )
+  }
+
+  const describe = id => !sources ? 'checking…' : sources[id]?.count ? `${sources[id].count} file${sources[id].count === 1 ? '' : 's'}, ${sizeLabel(sources[id].bytes)}` : 'none found on this PC'
+  return (
+    <div className="memory-import">
+      <h3>Import what your AI knows</h3>
+      <p className="install-note">Your agent reads what it’s given and suggests short memories. You review every one before anything is saved.</p>
+      <div className="import-sources" role="radiogroup" aria-label="Import from">
+        {[['claude', 'Claude Code on this PC', `Your instructions and memory notes · ${describe('claude')}`],
+          ['codex', 'Codex on this PC', `Your instructions and memory summary · ${describe('codex')}`],
+          ['paste', 'The Claude or ChatGPT app', 'Ask it what it knows about you, then paste the answer here']].map(([id, name, detail]) => (
+          <label key={id} className={`import-source${source === id ? ' on' : ''}${id !== 'paste' && !sources?.[id]?.count ? ' none' : ''}`}>
+            <input type="radio" name="import-source" value={id} checked={source === id} disabled={id !== 'paste' && !sources?.[id]?.count} onChange={() => setSource(id)} />
+            <span><strong>{name}</strong><small>{detail}</small></span>
+          </label>
+        ))}
+      </div>
+      {source === 'paste' && <div className="paste-flow">
+        <p className="install-note">1. Copy this and send it in the Claude or ChatGPT app:</p>
+        <blockquote>{sources?.pastePrompt}</blockquote>
+        <button type="button" className="quiet" onClick={() => navigator.clipboard.writeText(sources?.pastePrompt || '').then(() => setCopied(true))}>{copied ? 'Copied' : 'Copy'}</button>
+        <p className="install-note">2. Paste its answer here:</p>
+        <textarea aria-label="Paste the answer" rows="6" value={pasted} onChange={event => setPasted(event.target.value)} />
+      </div>}
+      <label className="agent-select import-engine"><span>Read with</span>
+        <select aria-label="Read with" value={engine} onChange={event => setEngine(event.target.value)}>
+          {Object.entries(engines).map(([id, name]) => <option key={id} value={id} disabled={!available.some(item => item.id === id && item.available)}>{name}</option>)}
+        </select>
+      </label>
+      {running && <p className="chat-status working" role="status"><span className="pulse" aria-hidden="true" />{engines[engine]} is reading and suggesting memories…</p>}
+      {problem && <p className="install-error">{problem}</p>}
+      <div className="install-actions">
+        <button type="button" className="primary" disabled={running || (source === 'paste' && pasted.trim().length < 20)} onClick={run}>Suggest memories</button>
+        <button type="button" className="quiet" disabled={running} onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  )
+}
+
+function Memory({ brandId, brandName, brands, available, defaultEngine }) {
+  const [lists, setLists] = useState({ you: [], business: [] })
+  const [importing, setImporting] = useState(false)
+  const [notice, setNotice] = useState('')
+  const [problem, setProblem] = useState('')
+  const load = useCallback(() => api.memoryList(brandId).then(setLists).catch(error => setProblem(error.message)), [brandId])
+  useEffect(() => { load() }, [load])
+  const scopes = [{ id: 'you', name: 'About you' }, ...brands.map(brand => ({ id: brand.id, name: brand.name }))]
+  if (importing) return <MemoryImport brands={brands} available={available} defaultEngine={defaultEngine} onCancel={() => setImporting(false)} onDone={saved => { setImporting(false); setNotice(`Saved ${saved} memor${saved === 1 ? 'y' : 'ies'}.`); load() }} />
+  return (
+    <div className="memory">
+      <div className="memory-head">
+        <p className="install-note">What your IV apps know about you. Every IV chat reads this, with Claude Code or Codex.</p>
+        <button type="button" className="quiet" onClick={() => { setNotice(''); setImporting(true) }}>Import from your AI</button>
+      </div>
+      {notice && <p className="memory-notice" role="status">{notice}</p>}
+      {problem && <p className="install-error">{problem}</p>}
+      <MemorySection title="About you" scope="you" items={lists.you} scopes={scopes} onChanged={load} />
+      {brandId && <MemorySection title={`About ${brandName}`} scope={brandId} items={lists.business} scopes={scopes} onChanged={load} />}
+    </div>
+  )
+}
+
 function readDock() {
   try {
     const saved = JSON.parse(localStorage.getItem(dockKey))
@@ -619,17 +824,19 @@ function App() {
 
       {panel && (
         <aside ref={panelRef} className={`panel from-${side}${closing ? ' closing' : ''}`} data-solid
-          style={{ left: panelLeft, top: panelTop, width: panelWidth }} aria-label={panel === 'chat' ? 'Chat panel' : 'Handoffs panel'}>
+          style={{ left: panelLeft, top: panelTop, width: panelWidth }} aria-label={panel === 'chat' ? 'Chat panel' : panel === 'memory' ? 'Memory panel' : 'Handoffs panel'}>
           <header className="panel-head">
             <div className="tabs" role="tablist">
               <button type="button" role="tab" aria-selected={panel === 'chat'} className={panel === 'chat' ? 'on' : ''} onClick={() => setPanel('chat')}>Chat</button>
+              <button type="button" role="tab" aria-selected={panel === 'memory'} className={panel === 'memory' ? 'on' : ''} onClick={() => setPanel('memory')}>Memory</button>
               <button type="button" role="tab" aria-selected={panel === 'handoffs'} className={panel === 'handoffs' ? 'on' : ''} onClick={() => setPanel('handoffs')}>Handoffs <span className="count">{items.length}</span></button>
             </div>
             <button type="button" className="tool" aria-label="Close panel" title="Close (Esc)" onClick={closePanel}>
               <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
             </button>
           </header>
-          {panel === 'chat'
+          {panel === 'memory' && <Memory brandId={brandId || ''} brandName={brandName} brands={data.brands} available={data.engines} defaultEngine={engine} key={brandId || 'all'} />}
+          {panel === 'memory' ? null : panel === 'chat'
             ? <Chat brandId={brandId || ''} available={data.engines} defaultEngine={engine} opening={opening} key={brandId || 'all'} />
             : <>
               <div className="panel-meta"><span className="for">{brandName}</span></div>

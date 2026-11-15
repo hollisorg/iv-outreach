@@ -34,8 +34,31 @@ const tools = [
     // Opening returns to an item the app already made: nothing is deleted or overwritten, and repeating it is safe.
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
+  {
+    name: 'hivemind_remember',
+    title: 'Remember a fact',
+    description: 'Save one short, lasting fact to IV memory, which every IV app chat reads: something about the person (about "you") or about the business selected in Hivemind (about "business"), such as a preference, how they like things written, a goal, a decision, their audience or offer. Save when they tell you something durable about themselves or their work, or ask you to remember it. One fact per call, in plain words, under 600 characters. Never save passwords, keys, codes, account numbers, one-off details or private facts about other people.',
+    inputSchema: {
+      type: 'object', additionalProperties: false, required: ['text'],
+      properties: {
+        text: { type: 'string', minLength: 3, maxLength: 600, description: 'The fact, in a short sentence.' },
+        about: { type: 'string', enum: ['you', 'business'], description: '"you" for the person, "business" for the selected business.' },
+      },
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: 'hivemind_recall',
+    title: 'Look in IV memory',
+    description: 'Search IV memory about the person and the selected business. The most recent memories already come with each message; use this to look for something specific that is not there.',
+    inputSchema: {
+      type: 'object', additionalProperties: false,
+      properties: { query: { type: 'string', maxLength: 200, description: 'Words to look for.' } },
+    },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
 ]
-const operationOf = { hivemind_find_handoffs: 'find', hivemind_reopen: 'reopen' }
+const operationOf = { hivemind_find_handoffs: 'find', hivemind_reopen: 'reopen', hivemind_remember: 'remember', hivemind_recall: 'recall' }
 
 const write = message => process.stdout.write(`${JSON.stringify(message)}\n`)
 async function handle(message) {

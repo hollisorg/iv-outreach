@@ -2,6 +2,17 @@
 
 Hivemind is a standalone Windows app for opening IV Outreach, IV Studio and IV Signal, plus IV Chat, IV Voice and IV Keys. The white IV eye opens a shared chat. The business picker filters saved handoffs, and each handoff opens in its receiving app. The chat uses an installed Claude Code or Codex session for planning and drafting with the selected workspace context.
 
+## IV memory (0.5.0, 2026-11-15)
+
+What the person's IV apps know about them and each business, whichever agent runs the chat.
+
+- **Store:** `src/service/iv-memory.js` (shared source, like `iv-workspace.js`), an SQLite file at `%APPDATA%\IV Workspace\memory.db` beside the shared workspace; this PC only. Scope `you` or a shared business ID. Up to 600 memories of up to 600 characters; exact duplicates are skipped; anything that looks like a password, key, token or code is refused.
+- **In chat:** each message carries the memories about the person and the selected business. Two more tools, `hivemind_remember` (one short fact, about "you" or the turn's business) and `hivemind_recall` (search). A green "Remembered" card shows each save with Forget it.
+- **Memory tab** (Chat · Memory · Handoffs): About you and About <business>, each memory editable, movable between you and a business, and forgettable; an Add box.
+- **Import from your AI:** Claude Code on this PC (`~/.claude/CLAUDE.md` and each project's `memory/MEMORY.md`), Codex on this PC (`~/.codex/AGENTS.md` and `memory_summary.md`), or the Claude/ChatGPT app (a prompt to copy, then paste its answer). The person's chosen agent reads it in one tool-free turn (up to about 70k characters) and suggests up to 40 short memories; the person ticks, edits and files them before anything is saved (`main/memory-import.js`).
+- **Not yet:** IV Outreach, IV Studio and IV Signal chats don't read IV memory yet; they need the shared module and a context line each.
+- Checks: `test/hivemind-memory.test.mjs`; `docs/verification/hivemind/memory-check.mjs claude|codex` (off screen, throwaway store: saved preference, recalled in a new thread, Memory tab, import of 40 suggestions from Claude Code's files and saving them).
+
 ## Chat harness (0.4.0, 2026-11-15)
 
 Hivemind is a light harness over the person's own Claude Code or Codex (their subscription), aimed at IV work: no shell, no files, only Hivemind's tools.

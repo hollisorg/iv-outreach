@@ -3,7 +3,7 @@
 import { createServer } from 'node:http'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 
-export const BRIDGE_OPERATIONS = ['find', 'reopen']
+export const BRIDGE_OPERATIONS = ['find', 'reopen', 'remember', 'recall']
 
 export async function startBridge(operations) {
   const token = randomBytes(32).toString('hex')

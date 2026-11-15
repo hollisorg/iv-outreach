@@ -9,6 +9,9 @@ import { createChat } from './chat.js'
 import { chatActions } from './actions.js'
 import { CATALOG, installApp, installInfo, latestRelease } from './install.js'
 import { modelList } from './models.js'
+import { openMemory } from '../../../src/service/iv-memory.js'
+import { memoryActions } from './memory-tools.js'
+import { PASTE_PROMPT, gatherMaterial, importSources, parseSuggestions, runDistill } from './memory-import.js'
 
 const directory = dirname(fileURLToPath(import.meta.url))
 let window
@@ -121,7 +124,36 @@ function start() {
   })
   const actions = chatActions({ readWorkspace, openApp, appStatus, programs })
   const mcpScript = app.isPackaged ? join(process.resourcesPath, 'app.asar', 'out', 'main', 'mcp.js') : join(directory, 'mcp.js')
-  const conversation = () => chat ||= createChat({ directory: join(app.getPath('userData'), 'chat'), workspace, emit: publish, actions, mcpScript })
+  // IV memory, shared with the other IV apps (HIVEMIND_MEMORY_DIR points a test copy at its own).
+  let memoryStore = null
+  const memory = () => memoryStore ||= openMemory(process.env.HIVEMIND_MEMORY_DIR || undefined)
+  const memoryTools = memoryActions({ memory })
+  const memoryPrompt = options => memory().prompt(options)
+  const conversation = () => chat ||= createChat({ directory: join(app.getPath('userData'), 'chat'), workspace, emit: publish, actions, memoryTools, memoryPrompt, mcpScript })
+  const brandExists = id => id === 'you' || workspace().brands.some(brand => brand.id === id)
+  handle('memory-list', (brandId) => ({ you: memory().list('you'), business: brandId ? memory().list(brandId) : [] }))
+  handle('memory-add', ({ scope, text, source }) => {
+    if (!brandExists(scope)) throw new Error('Choose who this memory is about.')
+    return memory().add({ scope, text, source: source === 'import' ? 'Imported' : 'Added in Hivemind', by: 'hivemind' })
+  })
+  handle('memory-update', (id, changes) => {
+    if (changes?.scope !== undefined && !brandExists(changes.scope)) throw new Error('Choose who this memory is about.')
+    return memory().update(id, changes || {})
+  })
+  handle('memory-remove', (id) => memory().remove(id))
+  handle('import-sources', () => {
+    const found = importSources()
+    return { claude: { count: found.claude.count, bytes: found.claude.bytes }, codex: { count: found.codex.count, bytes: found.codex.bytes }, pastePrompt: PASTE_PROMPT }
+  })
+  handle('import-run', async ({ source, text, engine }) => {
+    if (!['claude', 'codex', 'paste'].includes(source)) throw new Error('Choose where to import from.')
+    if (!['claude', 'codex'].includes(engine)) throw new Error('Choose Claude Code or Codex to read it.')
+    const brands = workspace().brands.map(({ id, name }) => ({ id, name }))
+    const material = gatherMaterial(source, { text })
+    const reply = await runDistill({ engine, material, brands, directory: join(app.getPath('userData'), 'chat') })
+    const known = new Set(memory().list().map(item => `${item.scope}|${item.text.toLowerCase()}`))
+    return { suggestions: parseSuggestions(reply, brands).filter(item => !known.has(`${item.scope}|${item.text.toLowerCase()}`)) }
+  })
   handle('threads', (brandId) => conversation().list(brandId || ''))
   handle('thread', (id) => conversation().view(id))
   handle('new-thread', (request) => conversation().create(request || {}))
