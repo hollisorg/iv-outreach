@@ -671,6 +671,7 @@ function App() {
   const [latest, setLatest] = useState(null)
   const [installs, setInstalls] = useState({})
   const [working, setWorking] = useState(null)
+  const [update, setUpdate] = useState(null)
   const holding = useRef(false)
   const drag = useRef(null)
   const panelRef = useRef(null)
@@ -689,6 +690,12 @@ function App() {
       setProblem(snapshot.problem || '')
     } catch (error) { setProblem(error.message) }
     finally { setRefreshing(false) }
+  }, [])
+
+  // Hivemind's own update: downloaded in the background, installed on Restart to update or when Hivemind closes.
+  useEffect(() => {
+    api.updateState().then(setUpdate).catch(() => {})
+    return api.onUpdate(setUpdate)
   }, [])
 
   useEffect(() => {
@@ -879,6 +886,12 @@ function App() {
           <button type="button" className={`chip${panel === 'handoffs' ? ' on' : ''}`} aria-expanded={panel === 'handoffs'} onClick={() => openPanel('handoffs')}>
             Handoffs<span className="count">{items.length}</span>
           </button>
+          {update?.status === 'ready' && (
+            <button type="button" className="chip update-chip" title={`Version ${update.available} is downloaded. Hivemind restarts to install it (it also installs when you close Hivemind).`}
+              onClick={() => api.installUpdate().catch(error => setProblem(error.message))}>
+              Restart to update
+            </button>
+          )}
           <span className="bar-tools">
             <button type="button" className={`tool${pinned ? ' on' : ''}`} aria-pressed={pinned} aria-label={pinned ? 'Stop keeping Hivemind on top' : 'Keep Hivemind on top'} title={pinned ? 'Kept on top' : 'Keep on top'} onClick={() => windowAction(pinned ? 'unpin' : 'pin')}>
               <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 1.8h5l-.8 4.3 2.6 2.4v1H8.6v4.7L8 15l-.6-.8V9.5H4.7v-1l2.6-2.4z" /></svg>

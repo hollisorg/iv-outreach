@@ -14,6 +14,7 @@ import { memoryActions } from './memory-tools.js'
 import { PASTE_PROMPT, gatherMaterial, importSources, parseSuggestions, runDistill } from './memory-import.js'
 import { appTools } from './app-tools.js'
 import { businesses } from './businesses.js'
+import { initUpdater, updateState } from './updater.js'
 
 const directory = dirname(fileURLToPath(import.meta.url))
 let window
@@ -132,6 +133,11 @@ function start() {
     }
   })
   handle('release', (id) => latestRelease(id))
+  // Hivemind's own updates (from the public releases-only repo). The dock shows "Restart to update" once one is ready.
+  const updater = initUpdater(state => { if (window && !window.isDestroyed()) window.webContents.send('hivemind:update', state) })
+  handle('update-state', () => updateState())
+  handle('update-check', () => updater.check())
+  handle('update-install', () => updater.install())
   handle('open-page', (id) => {
     const page = CATALOG[id]?.page
     if (!page || !/^https:\/\/github\.com\/hollisorg\//.test(page)) throw new Error('This app has no page yet.')

@@ -142,6 +142,7 @@ h1, h2, h3, p { margin: 0; }
 .dock-bar select:hover { border-color: var(--edge); }
 .chip { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid transparent; background: rgba(255, 255, 255, .05); font-size: 13px; }
 .chip:hover, .chip.on { border-color: var(--edge-strong); background: rgba(110, 28, 40, .45); }
+.update-chip { border-color: var(--edge-strong); color: #ff9aa2; }
 .count { display: inline-grid; place-items: center; min-width: 20px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--red-deep); color: #fff4ef; font: 10.5px/1 var(--mono); }
 .bar-tools { display: inline-flex; gap: 2px; padding-left: 4px; border-left: 1px solid rgba(255, 255, 255, .08); }
 .tool { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border-radius: 999px; border: 0; background: transparent; color: var(--muted); }

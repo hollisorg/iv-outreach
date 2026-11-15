@@ -33,6 +33,14 @@ contextBridge.exposeInMainWorld('hivemind', {
     ipcRenderer.on('hivemind:install', receive)
     return () => ipcRenderer.removeListener('hivemind:install', receive)
   },
+  updateState: () => ipcRenderer.invoke('hivemind:update-state'),
+  checkUpdate: () => ipcRenderer.invoke('hivemind:update-check'),
+  installUpdate: () => ipcRenderer.invoke('hivemind:update-install'),
+  onUpdate: (listener) => {
+    const receive = (_event, state) => listener(state)
+    ipcRenderer.on('hivemind:update', receive)
+    return () => ipcRenderer.removeListener('hivemind:update', receive)
+  },
   windowAction: (action) => ipcRenderer.invoke('hivemind:window', action),
   moveTo: (point) => ipcRenderer.invoke('hivemind:move-to', point),
   businesses: () => ipcRenderer.invoke('hivemind:businesses'),

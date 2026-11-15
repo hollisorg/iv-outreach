@@ -1,7 +1,7 @@
 {
   "name": "iv-hivemind",
   "productName": "IV Hivemind",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "The desktop overlay for IV Outreach, IV Studio, IV Signal, IV Chat, IV Voice and IV Keys.",
   "author": "The Hollis Organization",
   "license": "UNLICENSED",
@@ -13,10 +13,11 @@
     "electronVersion": "44.9.1",
     "files": ["out/**/*", "package.json"],
     "win": { "target": "nsis", "icon": "build/icon.ico" },
+    "publish": [{ "provider": "github", "owner": "hollisorg", "repo": "iv-hivemind-releases", "releaseType": "release" }],
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "artifactName": "IV-Hivemind-Setup-${version}.exe",
+      "artifactName": "IV-Hivemind-Setup.exe",
       "shortcutName": "IV Hivemind"
     }
   }
