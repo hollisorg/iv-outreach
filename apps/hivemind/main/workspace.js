@@ -6,7 +6,7 @@ import { APPS, handoffArgument, workspaceDir } from '../../../src/service/iv-wor
 
 export function readWorkspace(root = workspaceDir()) {
   const path = join(root, 'workspace.db')
-  if (!existsSync(path)) return { brands: [], handoffs: [], registrations: {}, links: {} }
+  if (!existsSync(path)) return { brands: [], handoffs: [], registrations: {}, links: {}, active: '' }
 
   const db = new DatabaseSync(path, { readOnly: true })
   try {
@@ -30,7 +30,11 @@ export function readWorkspace(root = workspaceDir()) {
       if (!Object.hasOwn(APPS, appId) || !rest.length || typeof value?.brandId !== 'string') continue
       ;(links[appId] ||= {})[rest.join(':')] = value.brandId
     }
-    return { brands, handoffs, registrations, links }
+    // The business active across the IV apps.
+    let active = ''
+    try { active = JSON.parse(meta.get('active')?.value ?? 'null')?.brandId || '' } catch {}
+    if (active && !brands.some(brand => brand.id === active)) active = ''
+    return { brands, handoffs, registrations, links, active }
   } finally {
     db.close()
   }

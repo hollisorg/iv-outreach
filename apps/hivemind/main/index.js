@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, screen, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, screen, shell } from 'electron'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -13,6 +13,7 @@ import { openMemory } from '../../../src/service/iv-memory.js'
 import { memoryActions } from './memory-tools.js'
 import { PASTE_PROMPT, gatherMaterial, importSources, parseSuggestions, runDistill } from './memory-import.js'
 import { appTools } from './app-tools.js'
+import { businesses } from './businesses.js'
 
 const directory = dirname(fileURLToPath(import.meta.url))
 let window
@@ -90,8 +91,8 @@ function start() {
       return { ...status, ...installInfo(id) }
     })
     return {
-      apps, tools, engines, problem,
-      brands: brands.map(({ id, name }) => ({ id, name })),
+      apps, tools, engines, problem, active: state.active || '',
+      brands: brands.map(({ id, name, accent }) => ({ id, name, accent })),
       handoffs: handoffs.map(item => ({
         id: item.id, source: item.source, target: item.target, brandId: item.brandId,
         brandName: item.brandSnapshot?.name, title: item.brief.title, goal: item.brief.goal,
@@ -195,6 +196,20 @@ function start() {
     const reply = await runDistill({ engine, material, brands, directory: join(app.getPath('userData'), 'chat') })
     const known = new Set(memory().list().map(item => `${item.scope}|${item.text.toLowerCase()}`))
     return { suggestions: parseSuggestions(reply, brands).filter(item => !known.has(`${item.scope}|${item.text.toLowerCase()}`)) }
+  })
+  // Businesses: the shared profiles, which one every IV app works on, and businesses still only in one app.
+  const profiles = businesses()
+  handle('businesses', () => profiles.list())
+  handle('active', () => profiles.active())
+  handle('set-active', (brandId) => {
+    if (brandId && !workspace().brands.some(brand => brand.id === brandId)) throw new Error('Choose a business available in Hivemind.')
+    return profiles.setActive(brandId || '')
+  })
+  handle('business-save', (request) => profiles.save(request || {}))
+  handle('business-share', (request) => profiles.share(request || {}))
+  handle('business-logo', async () => {
+    const choice = await dialog.showOpenDialog(window, { title: 'Choose a logo for this business', properties: ['openFile'], filters: [{ name: 'Logo under 4 MB', extensions: ['png', 'jpg', 'jpeg', 'webp'] }] })
+    return choice.canceled ? null : profiles.addLogo(choice.filePaths[0])
   })
   handle('threads', (brandId) => conversation().list(brandId || ''))
   handle('thread', (id) => conversation().view(id))

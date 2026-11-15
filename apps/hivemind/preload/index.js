@@ -35,6 +35,12 @@ contextBridge.exposeInMainWorld('hivemind', {
   },
   windowAction: (action) => ipcRenderer.invoke('hivemind:window', action),
   moveTo: (point) => ipcRenderer.invoke('hivemind:move-to', point),
+  businesses: () => ipcRenderer.invoke('hivemind:businesses'),
+  active: () => ipcRenderer.invoke('hivemind:active'),
+  setActive: (brandId) => ipcRenderer.invoke('hivemind:set-active', brandId),
+  saveBusiness: (request) => ipcRenderer.invoke('hivemind:business-save', request),
+  shareBusiness: (request) => ipcRenderer.invoke('hivemind:business-share', request),
+  pickLogo: () => ipcRenderer.invoke('hivemind:business-logo'),
   setSolid: (solid) => ipcRenderer.send('hivemind:solid', Boolean(solid)),
   onChat: (listener) => {
     const receive = (_event, state) => listener(state)

@@ -392,7 +392,7 @@ const METHODS = {
   workspaceSelect: ({businessId, campaignId = null}) => {
     if (!fs.getBusiness(getDb(),businessId)) throw new Error('Business not found.')
     if (campaignId && fs.getCampaign(getDb(),campaignId)?.business_id !== businessId) throw new Error('Campaign does not belong to this business.')
-    writeSettings({selectedBusinessId:businessId,selectedCampaignId:campaignId}); return true
+    writeSettings({selectedBusinessId:businessId,selectedCampaignId:campaignId}); ivWorkspace.picked(businessId); return true
   },
   uiGuideReady: ({requestId,error,place,found}) => { const pending=guideRequests.get(requestId);if(!pending)return false;clearTimeout(pending.timer);guideRequests.delete(requestId);if(error)pending.reject(new Error(String(error)));else pending.resolve({place,shown:!!found,note:found?'Opened the page and highlighted the named control.':'Opened the page, but the control is not visible in this workspace yet.'});return true },
   chooseBrandImage: async ({kind}) => {
@@ -774,6 +774,12 @@ else {
   })
   app.whenReady().then(async () => {
     ivWorkspace.ready()
+    // Follow the business chosen in IV Hivemind (or another IV app): select this app's copy of it.
+    ivWorkspace.followActive({ select: ({ localId }) => {
+      if (!localId || readSettings().selectedBusinessId === localId) return
+      writeSettings({ selectedBusinessId: localId, selectedCampaignId: null })
+      send('workspace:active', { businessId: localId })
+    } })
     createWindow()
     appUpdates = new AppUpdates({ updater: updaterPackage.autoUpdater, version: app.getVersion(), supported: app.isPackaged && process.platform === 'win32', onChange: () => send('updates:changed', updatesStatus()) })
     const checkUpdates = () => { if (readSettings().automaticUpdateChecks !== false) appUpdates.check().catch(() => {}) }

@@ -61,6 +61,8 @@ export default function App() {
   }, [business?.id, campaign?.id])
 
   useEffect(() => { document.querySelector('main')?.scrollTo({top:0}) }, [page])
+  // The business chosen in IV Hivemind (or another IV app) changed: show it here too.
+  useEffect(() => on('workspace:active', ({ businessId: id }) => { setBusinessId(id); setCampaignId(undefined); setLeadId(null); reloadWorkspace() }), [])
 
   const notify = (text, tone = 'error') => {
     setToast({ text, tone })

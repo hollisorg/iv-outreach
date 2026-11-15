@@ -8,6 +8,7 @@ import signalIcon from './app-icons/signal.png'
 import voiceIcon from './app-icons/voice.png'
 import keysIcon from './app-icons/keys.png'
 import { RichText } from './rich-text.jsx'
+import { BusinessSwitcher, Businesses } from './businesses.jsx'
 import './styles.css'
 
 // Hivemind floats on the desktop: a transparent, borderless overlay. Everything the person can see or click carries
@@ -682,7 +683,8 @@ function App() {
     try {
       const snapshot = await api.snapshot()
       setData(snapshot)
-      setBrandId(previous => previous !== null && (!previous || snapshot.brands.some(brand => brand.id === previous)) ? previous : snapshot.brands[0]?.id || '')
+      // The business every IV app is on (chosen here or in an app).
+      setBrandId(previous => previous !== null && (!previous || snapshot.brands.some(brand => brand.id === previous)) ? previous : snapshot.active || '')
       setEngine(snapshot.engines.find(item => item.available)?.id || 'claude')
       setProblem(snapshot.problem || '')
     } catch (error) { setProblem(error.message) }
@@ -726,6 +728,27 @@ function App() {
       if (state.done) refresh()
     })
     return stop
+  }, [refresh])
+
+  // Switching business here switches every IV app; a shared business picked in an app switches Hivemind too.
+  const brandRef = useRef(null)
+  brandRef.current = brandId
+  const known = useRef([])
+  known.current = data.brands
+  async function pickBusiness(id) {
+    setBrandId(id)
+    try { await api.setActive(id) } catch (error) { setProblem(error.message) }
+  }
+  useEffect(() => {
+    const timer = setInterval(() => {
+      api.active().then(active => {
+        const id = active?.brandId || ''
+        if (!active?.at || id === brandRef.current) return
+        if (id && !known.current.some(brand => brand.id === id)) refresh()
+        setBrandId(id)
+      }).catch(() => {})
+    }, 4000)
+    return () => clearInterval(timer)
   }, [refresh])
 
   // Which IV app the chat is working in right now (its tile shows it).
@@ -852,12 +875,7 @@ function App() {
           <span className="eye-label">{working ? `Working in ${appNames[working]}` : 'Ask Hivemind'}</span>
         </button>
         <div className="dock-bar" data-solid>
-          <label className="business"><span className="sr-only">Business</span>
-            <select aria-label="Business" value={brandId || ''} onChange={event => setBrandId(event.target.value)}>
-              <option value="">All businesses</option>
-              {data.brands.map(brand => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
-            </select>
-          </label>
+          <BusinessSwitcher brands={data.brands} brandId={brandId || ''} onPick={pickBusiness} onManage={() => { setClosing(false); setPanel('businesses') }} />
           <button type="button" className={`chip${panel === 'handoffs' ? ' on' : ''}`} aria-expanded={panel === 'handoffs'} onClick={() => openPanel('handoffs')}>
             Handoffs<span className="count">{items.length}</span>
           </button>
@@ -881,19 +899,21 @@ function App() {
 
       {panel && (
         <aside ref={panelRef} className={`panel from-${side}${closing ? ' closing' : ''}`} data-solid
-          style={{ left: panelLeft, top: panelTop, width: panelWidth }} aria-label={panel === 'chat' ? 'Chat panel' : panel === 'memory' ? 'Memory panel' : 'Handoffs panel'}>
+          style={{ left: panelLeft, top: panelTop, width: panelWidth }} aria-label={panel === 'chat' ? 'Chat panel' : panel === 'memory' ? 'Memory panel' : panel === 'businesses' ? 'Businesses panel' : 'Handoffs panel'}>
           <header className="panel-head">
             <div className="tabs" role="tablist">
               <button type="button" role="tab" aria-selected={panel === 'chat'} className={panel === 'chat' ? 'on' : ''} onClick={() => setPanel('chat')}>Chat</button>
               <button type="button" role="tab" aria-selected={panel === 'memory'} className={panel === 'memory' ? 'on' : ''} onClick={() => setPanel('memory')}>Memory</button>
               <button type="button" role="tab" aria-selected={panel === 'handoffs'} className={panel === 'handoffs' ? 'on' : ''} onClick={() => setPanel('handoffs')}>Handoffs <span className="count">{items.length}</span></button>
+              <button type="button" role="tab" aria-selected={panel === 'businesses'} className={panel === 'businesses' ? 'on' : ''} onClick={() => setPanel('businesses')}>Businesses</button>
             </div>
             <button type="button" className="tool" aria-label="Close panel" title="Close (Esc)" onClick={closePanel}>
               <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
             </button>
           </header>
           {panel === 'memory' && <Memory brandId={brandId || ''} brandName={brandName} brands={data.brands} available={data.engines} defaultEngine={engine} key={brandId || 'all'} />}
-          {panel === 'memory' ? null : panel === 'chat'
+          {panel === 'businesses' && <Businesses activeId={brandId || ''} onPick={pickBusiness} onChanged={refresh} />}
+          {panel === 'memory' || panel === 'businesses' ? null : panel === 'chat'
             ? <Chat brandId={brandId || ''} available={data.engines} defaultEngine={engine} opening={opening} key={brandId || 'all'} />
             : <>
               <div className="panel-meta"><span className="for">{brandName}</span></div>

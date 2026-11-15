@@ -350,3 +350,55 @@ select option { background: #1d1418; color: var(--ink); }
 .rich strong { color: var(--ink); font-size: inherit; font-weight: 650; }
 .rich code { padding: 1px 5px; border-radius: 5px; background: rgba(0, 0, 0, .35); font: 12px var(--mono); }
 .rich .rich-heading { font-weight: 650; color: var(--ink); }
+/* Business switcher on the dock: every IV app works on the business picked here. */
+.switcher { position: relative; }
+.switch-button { display: inline-flex; align-items: center; gap: 8px; max-width: 260px; height: 32px; padding: 0 10px 0 6px; border-radius: 999px; border: 1px solid transparent; background: #231a1e; font-size: 13px; }
+.switch-button:hover, .switch-button[aria-expanded=true] { border-color: var(--edge-strong); }
+.switch-button span { overflow: hidden; text-overflow: ellipsis; }
+.switch-button svg { flex: none; width: 12px; height: 12px; fill: none; stroke: var(--muted); stroke-width: 1.8; rotate: 180deg; transition: rotate .2s var(--ease); }
+.switch-button[aria-expanded=true] svg { rotate: 0deg; }
+.switch-menu { position: absolute; left: 0; top: calc(100% + 8px); z-index: 20; width: 280px; max-height: 300px; overflow-y: auto; padding: 6px; border-radius: 16px; border: 1px solid var(--edge); background: var(--glass); box-shadow: 0 18px 40px rgba(0, 0, 0, .6); display: grid; gap: 2px; animation: rise-in .18s var(--ease) both; }
+.switch-menu > small { padding: 6px 9px 4px; font: 10px/1.3 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.switch-menu button { display: flex; align-items: center; gap: 9px; min-height: 40px; padding: 6px 9px; border-radius: 11px; border: 0; background: transparent; text-align: left; font-size: 13.5px; }
+.switch-menu button span:not(.biz-mark) { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.switch-menu button:hover, .switch-menu button[aria-selected=true] { background: rgba(110, 28, 40, .45); }
+.switch-menu button i { font-style: normal; color: var(--red); }
+.switch-menu .switch-manage { justify-content: center; margin-top: 4px; border-top: 1px solid rgba(255, 255, 255, .07); border-radius: 0 0 11px 11px; color: var(--muted); font-size: 12.5px; }
+.biz-mark { flex: none; display: inline-grid; place-items: center; border-radius: 7px; color: #fff8f3; font-weight: 700; object-fit: cover; background: #3a2a30; }
+.biz-mark.all { background: rgba(255, 255, 255, .08); color: var(--muted); font-size: 13px; }
+
+/* Businesses tab */
+.businesses { display: grid; align-content: start; gap: 12px; padding: 10px 16px 16px; overflow-y: auto; max-height: 590px; min-height: 0; scrollbar-width: thin; scrollbar-color: rgba(255, 120, 130, .3) transparent; }
+.biz-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.biz-top p { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+.biz-top .quiet { margin-top: 0; flex: none; }
+.biz-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.biz-list li { display: grid; grid-template-columns: auto 1fr; gap: 10px 12px; align-items: center; padding: 11px 12px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, .07); background: rgba(255, 255, 255, .035); }
+.biz-list li.on { border-color: var(--edge-strong); background: rgba(90, 24, 34, .38); }
+.biz-body { display: grid; gap: 3px; min-width: 0; }
+.biz-body strong { font-size: 14.5px; }
+.biz-body small { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.biz-apps { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.biz-apps span { padding: 1px 7px; border-radius: 999px; font: 10px/1.6 var(--mono); color: var(--muted); background: rgba(255, 255, 255, .05); }
+.biz-apps span.yes { color: #bfe9d2; background: rgba(111, 196, 154, .14); }
+.biz-actions { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; }
+.biz-actions .primary { height: 34px; }
+.biz-actions .quiet { margin-top: 0; height: 34px; }
+.biz-current { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: 12px; background: rgba(111, 196, 154, .14); color: #bfe9d2; font-size: 12.5px; font-weight: 600; }
+.biz-unshared { display: grid; gap: 6px; padding-top: 4px; border-top: 1px solid rgba(255, 255, 255, .07); }
+.biz-unshared h3 { margin: 6px 0 0; font: 800 17px/1 var(--display); text-transform: uppercase; letter-spacing: .02em; }
+.biz-unshared p { margin: 0; color: var(--muted); font-size: 12px; }
+.biz-unshared ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.biz-unshared li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border-radius: 12px; background: rgba(255, 255, 255, .03); }
+.biz-unshared li > span { display: grid; gap: 2px; min-width: 0; }
+.biz-unshared li small { color: var(--muted); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.biz-unshared .quiet { margin-top: 0; flex: none; }
+.biz-form { display: grid; gap: 9px; }
+.biz-form-head { display: flex; align-items: flex-end; gap: 10px; }
+.biz-logo { display: grid; justify-items: center; gap: 3px; padding: 4px; border-radius: 12px; border: 1px dashed var(--edge); background: transparent; }
+.biz-logo small { color: var(--muted); font-size: 10.5px; }
+.biz-name { flex: 1; }
+.biz-field, .biz-name { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+.biz-field input, .biz-field textarea, .biz-name input { width: 100%; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--edge); background: rgba(0, 0, 0, .25); color: var(--ink); font: inherit; font-size: 13px; resize: vertical; }
+.biz-accent input { width: 38px; height: 38px; padding: 2px; border-radius: 10px; border: 1px solid var(--edge); background: transparent; }
+.biz-note { margin: 0; color: var(--muted); font-size: 11.5px; line-height: 1.45; }

@@ -2,6 +2,17 @@
 
 Hivemind is a standalone Windows app for opening IV Outreach, IV Studio and IV Signal, plus IV Chat, IV Voice and IV Keys. The white IV eye opens a shared chat. The business picker filters saved handoffs, and each handoff opens in its receiving app. The chat uses an installed Claude Code or Codex session for planning and drafting with the selected workspace context.
 
+## One business across the IV apps (0.7.0, 2026-11-15)
+
+The person picks the business they're working on once, in Hivemind, and every IV app follows it with its memory.
+
+- **Active business:** the shared workspace keeps it (`active()`/`setActive()` in `src/service/iv-workspace.js`, meta key `active`; `''` means all businesses). Hivemind's dock switcher and the Businesses tab set it.
+- **Outreach and Signal follow** (`followActive` in `src/service/iv-workspace-host.js`): on launch and every 3 s while open they select their linked copy of it, making the copy from the shared profile first if they have none, and their window switches (`workspace:active`). Picking a shared business inside either app (`picked`) makes it active everywhere; picking a business that isn't shared changes only that app.
+- **The Hivemind button in each app** (Outreach, Signal, Studio; shared `IVWorkspace.jsx`) shows the active business and opens a short pop-up (Matthew's call): what Hivemind is, then **Open Hivemind** when it's installed in the standard per-user folder (launches it) or **Get Hivemind** (opens `HIVEMIND_PAGE`, https://infinitevariance.ai/downloads, which does not list Hivemind yet). "Handoffs in this app" still opens the earlier in-app panel, which also still opens for incoming handoffs. `IV_HIVEMIND_EXE` points a test copy at another program. Check: `docs/verification/hivemind/popup-check.mjs`.
+- **Studio:** Studio's chat gets its shared profile and memories (`ivMemoryNote({ useActive: true })`).
+- **Businesses tab** (`main/businesses.js`, `renderer/businesses.jsx`): the shared profiles with which apps have a copy, Work on this, Edit and New business (name, website, offer, audience, voice, look, place, goal, colour, logo), and businesses that so far exist in only one app (read from Outreach's and Signal's own databases) with Share, which saves the profile and logo and links that app's copy exactly as the app's own Share does. Edits reach Outreach and Signal's copies the next time their Hivemind panel refreshes (every 4 s while open).
+- Checks: `test/hivemind-businesses.test.mjs`; `docs/verification/hivemind/follow-check.mjs` (Outreach and Signal test copies on throwaway data: open on the active business, switch while open, show it, an in-app pick sets it); `docs/verification/hivemind/businesses-check.mjs [--packaged]` (switcher, Businesses tab, share, new, edit, following an app's pick).
+
 ## Working in the IV apps (0.6.0, 2026-11-15)
 
 Hivemind's chat does the work in IV Outreach, IV Signal and IV Studio itself, through each app's own tools, and the person can watch.
