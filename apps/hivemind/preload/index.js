@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld('hivemind', {
     return () => ipcRenderer.removeListener('hivemind:install', receive)
   },
   windowAction: (action) => ipcRenderer.invoke('hivemind:window', action),
+  moveTo: (point) => ipcRenderer.invoke('hivemind:move-to', point),
   setSolid: (solid) => ipcRenderer.send('hivemind:solid', Boolean(solid)),
   onChat: (listener) => {
     const receive = (_event, state) => listener(state)

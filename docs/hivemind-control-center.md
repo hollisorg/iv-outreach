@@ -48,6 +48,7 @@ Hivemind has no window frame. It is a transparent, borderless window covering th
 - The eye opens a dark glass panel on the side with more room, with Chat and Handoffs tabs. Esc closes it. Enter sends; Shift+Enter adds a line.
 - Motion: the eye fades in, the tiles spring out from it and drift, threads flow to them, the panel slides in from the eye's side. Reduced motion turns all of it off.
 - Browser video (0.6.0): while the pointer is over a control the overlay takes clicks and, to Windows, became a plain opaque rectangle over the whole screen, so Chrome and Edge treated a browser under it as covered and stopped drawing its video (YouTube froze while Hivemind was dragged). The window now has a region with one corner pixel left out (`shapeWindow` in `main/index.js`), which browsers' occlusion checks skip. `docs/verification/hivemind/shape-check.mjs` checks the packaged window's region in both states.
+- Monitors (0.6.1): dragging the eye past the edge of its screen moves the overlay to the display under the pointer and the drag carries on there (`hivemind:move-to`). `docs/verification/hivemind/monitor-check.mjs` checks it off screen.
 - If the screen layout changes, the window refits to its display. Launching Hivemind again moves it to the screen the mouse is on.
 
 Check: `docs/verification/hivemind/overlay-check.mjs <win.ps1 helper> [--packaged]` drives the real desktop (it moves the mouse and takes screen captures, so run it only when nobody is using the PC, and don't keep the captures if other apps are on screen).

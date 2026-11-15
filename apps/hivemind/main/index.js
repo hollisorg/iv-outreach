@@ -208,6 +208,15 @@ function start() {
   handle('stop', () => chat?.stop())
 
   handle('overlay', () => ({ pinned: Boolean(window.isAlwaysOnTop()) }))
+  // The eye was dragged past this screen's edge: cover the screen under it instead.
+  handle('move-to', (point) => {
+    const x = Math.round(Number(point?.x))
+    const y = Math.round(Number(point?.y))
+    if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error('Unknown place.')
+    const area = screen.getDisplayNearestPoint({ x, y }).workArea
+    coverArea(area)
+    return area
+  })
   handle('window', (action) => {
     if (action === 'minimize') window.minimize()
     else if (action === 'quit') app.quit()

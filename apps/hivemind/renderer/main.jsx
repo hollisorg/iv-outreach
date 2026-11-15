@@ -766,20 +766,30 @@ function App() {
   }
 
   // The eye moves the whole dock when dragged; a click without a drag opens chat.
+  // Dragging works in screen coordinates, so the eye can be carried onto another monitor: when it passes this
+  // screen's edge, the overlay moves to the screen under it and the drag carries on there.
   function grab(event) {
     if (event.button !== 0) return
-    drag.current = { x: event.clientX, y: event.clientY, cx, cy, moved: false }
+    drag.current = { sx: event.screenX, sy: event.screenY, ex: window.screenX + cx, ey: window.screenY + cy, moved: false }
     holding.current = true
     event.currentTarget.setPointerCapture(event.pointerId)
   }
   function move(event) {
     const current = drag.current
     if (!current) return
-    const dx = event.clientX - current.x
-    const dy = event.clientY - current.y
+    const dx = event.screenX - current.sx
+    const dy = event.screenY - current.sy
     if (!current.moved && Math.hypot(dx, dy) < 6) return
     if (!current.moved) { current.moved = true; setDragging(true) }
-    setDock({ x: (current.cx + dx) / width, y: (current.cy + dy) / height })
+    const ex = current.ex + dx
+    const ey = current.ey + dy
+    const left = window.screenX
+    const top = window.screenY
+    if (!current.switching && (ex < left || ey < top || ex >= left + window.innerWidth || ey >= top + window.innerHeight)) {
+      current.switching = true
+      api.moveTo({ x: ex, y: ey }).catch(() => {}).finally(() => { current.switching = false })
+    }
+    setDock({ x: (ex - window.screenX) / window.innerWidth, y: (ey - window.screenY) / window.innerHeight })
   }
   function release() {
     const current = drag.current
