@@ -4,7 +4,8 @@
 import { createInterface } from 'node:readline'
 import { callBridge } from '../main/bridge.js'
 
-const instructions = 'Hivemind tools reopen work that already exists in the IV apps for the business selected in Hivemind. They never create, approve, generate, schedule or publish anything.'
+const instructions = 'Hivemind tools work in the IV apps for the business selected in Hivemind: reopen existing handoffs, keep IV memory, and use IV Outreach, IV Signal and IV Studio through their own tools (iv_app_tools, iv_app_tool, iv_app_call). Each app keeps its own rules: anything that approves, spends, deletes, sends or changes settings waits for the person to allow it in Hivemind.'
+const APP = { type: 'string', enum: ['outreach', 'signal', 'studio'], description: 'outreach (IV Outreach: leads, research, outreach drafts), signal (IV Signal: social posts, brand brain, calendar) or studio (IV Studio: video shots, pictures, voices, music, edits).' }
 const tools = [
   {
     name: 'hivemind_find_handoffs',
@@ -57,8 +58,30 @@ const tools = [
     },
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
+  {
+    name: 'iv_app_tools',
+    title: 'Find an IV app\'s tools',
+    description: 'List or search the tools of an installed IV app, with the app\'s own guide. Use words for what you want to do ("draft post", "render shot", "leads"). Each tool is marked look (reads) or change. Then call iv_app_tool for one tool\'s inputs.',
+    inputSchema: { type: 'object', additionalProperties: false, required: ['app'], properties: { app: APP, search: { type: 'string', maxLength: 200, description: 'Words for what you want to do. Leave out to list everything briefly.' } } },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: 'iv_app_tool',
+    title: 'Read one IV app tool',
+    description: 'The full description and input schema of one tool from iv_app_tools. Read it before calling the tool.',
+    inputSchema: { type: 'object', additionalProperties: false, required: ['app', 'tool'], properties: { app: APP, tool: { type: 'string', maxLength: 80 } } },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: 'iv_app_call',
+    title: 'Use an IV app tool',
+    description: 'Run one tool in an IV app, exactly as that app\'s own chat would. The app brings itself up so the person can watch. Anything the app asks permission for (approving, spending, deleting, sending, changing settings) waits for the person\'s Allow in Hivemind; if they choose Don\'t allow, it does not run and you must not retry unless they ask. Long work such as renders returns a job to check with the app\'s own status tool.',
+    inputSchema: { type: 'object', additionalProperties: false, required: ['app', 'tool'], properties: { app: APP, tool: { type: 'string', maxLength: 80 }, arguments: { type: 'object', description: 'The tool\'s inputs, matching its input schema.' } } },
+    // Local IV apps on this PC. Their own Allow cards gate anything that approves, spends, deletes or sends.
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  },
 ]
-const operationOf = { hivemind_find_handoffs: 'find', hivemind_reopen: 'reopen', hivemind_remember: 'remember', hivemind_recall: 'recall' }
+const operationOf = { hivemind_find_handoffs: 'find', hivemind_reopen: 'reopen', hivemind_remember: 'remember', hivemind_recall: 'recall', iv_app_tools: 'app_tools', iv_app_tool: 'app_tool', iv_app_call: 'app_call' }
 
 const write = message => process.stdout.write(`${JSON.stringify(message)}\n`)
 async function handle(message) {
@@ -67,7 +90,7 @@ async function handle(message) {
   if (method === 'initialize') {
     return write({ jsonrpc: '2.0', id, result: {
       protocolVersion: typeof params.protocolVersion === 'string' ? params.protocolVersion : '2025-06-18',
-      capabilities: { tools: {} }, serverInfo: { name: 'hivemind', version: '0.2.0' }, instructions,
+      capabilities: { tools: {} }, serverInfo: { name: 'hivemind', version: '0.6.0' }, instructions,
     } })
   }
   if (method === 'ping') return write({ jsonrpc: '2.0', id, result: {} })

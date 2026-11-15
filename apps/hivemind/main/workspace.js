@@ -6,7 +6,7 @@ import { APPS, handoffArgument, workspaceDir } from '../../../src/service/iv-wor
 
 export function readWorkspace(root = workspaceDir()) {
   const path = join(root, 'workspace.db')
-  if (!existsSync(path)) return { brands: [], handoffs: [], registrations: {} }
+  if (!existsSync(path)) return { brands: [], handoffs: [], registrations: {}, links: {} }
 
   const db = new DatabaseSync(path, { readOnly: true })
   try {
@@ -21,7 +21,16 @@ export function readWorkspace(root = workspaceDir()) {
       .map(row => JSON.parse(row.value))
       .filter(item => item.schema === 'iv.handoff.v1' && Object.hasOwn(APPS, item.target))
     const registrations = Object.fromEntries(Object.keys(APPS).map(id => [id, JSON.parse(meta.get(`app:${id}`)?.value ?? 'null')]))
-    return { brands, handoffs, registrations }
+    // Each app's own business IDs linked to a shared business: { outreach: { localId: brandId }, signal: {...} }.
+    const links = {}
+    for (const row of db.prepare('SELECT key, value FROM links').all()) {
+      const [appId, , ...rest] = String(row.key).split(':')
+      let value = null
+      try { value = JSON.parse(row.value) } catch {}
+      if (!Object.hasOwn(APPS, appId) || !rest.length || typeof value?.brandId !== 'string') continue
+      ;(links[appId] ||= {})[rest.join(':')] = value.brandId
+    }
+    return { brands, handoffs, registrations, links }
   } finally {
     db.close()
   }

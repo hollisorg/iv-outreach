@@ -3,7 +3,9 @@
 import { createServer } from 'node:http'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 
-export const BRIDGE_OPERATIONS = ['find', 'reopen', 'remember', 'recall']
+export const BRIDGE_OPERATIONS = ['find', 'reopen', 'remember', 'recall', 'app_tools', 'app_tool', 'app_call']
+// Calls into an IV app can run for minutes (a render, or waiting on the person's Allow).
+const WAIT_MS = { app_tools: 120000, app_tool: 120000, app_call: 25 * 60 * 1000 }
 
 export async function startBridge(operations) {
   const token = randomBytes(32).toString('hex')
@@ -23,7 +25,7 @@ export async function startBridge(operations) {
       let body = ''
       for await (const chunk of req) {
         body += chunk.toString('utf8')
-        if (body.length > 4096) throw new Error('Request too large.')
+        if (body.length > 262144) throw new Error('Request too large.')
       }
       const args = JSON.parse(body || '{}')
       if (!args || typeof args !== 'object' || Array.isArray(args)) throw new Error('Send an object.')
@@ -47,7 +49,7 @@ export async function callBridge(operation, args = {}, env = process.env) {
   }
   if (!BRIDGE_OPERATIONS.includes(operation)) throw new Error('Unknown Hivemind operation.')
   const response = await fetch(`${env.HIVEMIND_BRIDGE_URL}/${operation}`, {
-    method: 'POST', redirect: 'error', signal: AbortSignal.timeout(30000),
+    method: 'POST', redirect: 'error', signal: AbortSignal.timeout(WAIT_MS[operation] || 30000),
     headers: { Authorization: `Bearer ${env.HIVEMIND_BRIDGE_TOKEN}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(args),
   })

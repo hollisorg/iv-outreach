@@ -101,7 +101,7 @@ test('bridge needs the token and MCP server lists and calls the tools', async ()
     for (let wait = 0; replies.length < 3 && wait < 100; wait++) await new Promise(resolve => setTimeout(resolve, 50))
     server.kill()
     assert.equal(replies[0].result.serverInfo.name, 'hivemind')
-    assert.deepEqual(replies[1].result.tools.map(tool => tool.name), ['hivemind_find_handoffs', 'hivemind_reopen', 'hivemind_remember', 'hivemind_recall'])
+    assert.deepEqual(replies[1].result.tools.map(tool => tool.name), ['hivemind_find_handoffs', 'hivemind_reopen', 'hivemind_remember', 'hivemind_recall', 'iv_app_tools', 'iv_app_tool', 'iv_app_call'])
     assert.deepEqual(JSON.parse(replies[2].result.content[0].text), { count: 0, handoffs: [] })
     assert.deepEqual(calls.at(-1), { search: 'holiday' })
   } finally { bridge.close() }

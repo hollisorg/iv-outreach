@@ -7,6 +7,7 @@ import studioIcon from './app-icons/studio.png'
 import signalIcon from './app-icons/signal.png'
 import voiceIcon from './app-icons/voice.png'
 import keysIcon from './app-icons/keys.png'
+import { RichText } from './rich-text.jsx'
 import './styles.css'
 
 // Hivemind floats on the desktop: a transparent, borderless overlay. Everything the person can see or click carries
@@ -77,7 +78,7 @@ function useClickThrough(holding) {
 }
 
 // A menu tile. Installed apps open; a missing app shows greyed out and offers to install it.
-function AppOrb({ app, launch, opening, index, onMissing, progress }) {
+function AppOrb({ app, launch, opening, index, onMissing, progress, working }) {
   const detail = appDetails[app.id]
   const radians = detail.angle * Math.PI / 180
   const dx = Math.round(Math.cos(radians) * orbitRadius)
@@ -85,7 +86,7 @@ function AppOrb({ app, launch, opening, index, onMissing, progress }) {
   const missing = !app.installed
   const badge = missing ? (app.installable ? 'Get' : app.id === 'outreach' ? 'Private' : 'Soon') : null
   return (
-    <div className={`orb-slot slot-${app.id}${app.tool ? ' tool-slot' : ''}${missing ? ' missing' : ''}`} style={{ '--dx': `${dx}px`, '--dy': `${dy}px`, '--i': index }}>
+    <div className={`orb-slot slot-${app.id}${app.tool ? ' tool-slot' : ''}${missing ? ' missing' : ''}${working ? ' working' : ''}`} style={{ '--dx': `${dx}px`, '--dy': `${dy}px`, '--i': index }}>
       <button className={`app-orb node-${app.id}`} type="button" data-solid
         aria-label={missing ? `Get ${app.name}` : `Open ${app.name}`} disabled={opening && !missing}
         title={missing ? `${app.name} isn't installed. ${detail.detail}` : `${app.name}: ${detail.detail}`}
@@ -94,6 +95,7 @@ function AppOrb({ app, launch, opening, index, onMissing, progress }) {
         <span className="app-label"><strong>{appNames[app.id]}</strong><small>{detail.line}</small></span>
         {badge && <span className={`app-badge${app.installable ? ' get' : ''}`}>{badge}</span>}
         {progress && <span className="app-progress" aria-hidden="true"><i style={{ width: `${progress.percent || 0}%` }} /></span>}
+        {working && <span className="app-working">Working</span>}
       </button>
     </div>
   )
@@ -148,8 +150,42 @@ function RememberedCard({ item }) {
   )
 }
 
+// An app asked before doing something (its own rule). While the reply runs it waits for Allow or Don't allow.
+function AllowCard({ card, onAnswer }) {
+  const [sending, setSending] = useState(false)
+  const settled = { allowed: 'Allowed', declined: 'Not allowed', expired: 'No answer, so it didn\'t run' }[card.state]
+  async function reply(allow) {
+    setSending(true)
+    try { await onAnswer(card.key, allow) } finally { setSending(false) }
+  }
+  return (
+    <div className={`action-card allow ${card.state}`} role={card.state === 'waiting' ? 'alertdialog' : 'status'} aria-label={`${card.appName} asks`}>
+      <span className="action-kind"><span className="action-dot" aria-hidden="true" />{settled ? `${settled} in ${card.appName.replace('IV ', '')}` : `${card.appName.replace('IV ', '')} asks first`}</span>
+      <strong>{card.why}</strong>
+      {card.state === 'waiting' && onAnswer && <div className="allow-actions">
+        <button type="button" className="primary" disabled={sending} onClick={() => reply(true)}>Allow</button>
+        <button type="button" className="quiet" disabled={sending} onClick={() => reply(false)}>Don't allow</button>
+      </div>}
+    </div>
+  )
+}
+
 function ActionCard({ action, onChoose, disabled }) {
   if (action.type === 'remembered') return <RememberedCard item={action.item} />
+  if (action.type === 'asked') return <AllowCard card={{ ...action, key: '' }} />
+  if (action.type === 'worked') {
+    return (
+      <div className="action-card worked" role="status">
+        {action.items.map(entry => (
+          <div className="worked-row" key={entry.app}>
+            <span><span className="action-kind"><span className="action-dot" aria-hidden="true" />{entry.changed ? 'Worked in' : 'Looked in'} {entry.appName.replace('IV ', '')}</span>
+              <small>{entry.tools.length} {entry.tools.length === 1 ? 'tool' : 'tools'}: {entry.tools.map(tool => tool.replace(/^(fitscout|signal)_/, '').replace(/_/g, ' ')).join(', ')}</small></span>
+            <button type="button" className="quiet" onClick={() => api.openApp(entry.app).catch(() => {})}>Show {entry.appName.replace('IV ', '')}</button>
+          </div>
+        ))}
+      </div>
+    )
+  }
   if (action.type === 'opened') {
     const { item } = action
     return (
@@ -338,6 +374,12 @@ function Chat({ brandId, available, defaultEngine, opening }) {
     }
   }
 
+  async function answer(key, allow) {
+    setProblem('')
+    try { const state = await api.answer({ threadId, key, allow }); setLive(state.live) }
+    catch (error) { setProblem(error.message) }
+  }
+
   async function choose(handoffId) {
     if (busy || choosing || !threadId) return
     setChoosing(true)
@@ -380,16 +422,16 @@ function Chat({ brandId, available, defaultEngine, opening }) {
         {!loading && !messages.length && !live && <div className="chat-welcome">
           <span className="eye-image small"><img src={logo} alt="" /></span>
           <h2>What are you working on?</h2>
-          <p>Plan work across the IV apps, draft copy, or reopen a draft or project.</p>
+          <p>Ask for something and Hivemind does it in IV Outreach, Signal or Studio. You'll see the app work, and anything that needs your OK waits for you.</p>
           <div className="examples">
-            {['Reopen my latest Signal draft', 'Summarize my recent handoffs', 'Draft a LinkedIn post'].map(prompt => <button type="button" key={prompt} disabled={!ready || busy} onClick={() => { setDraft(prompt); composer.current?.focus() }}>{prompt}</button>)}
+            {['Draft a LinkedIn post in Signal', 'What leads do I have in Outreach?', 'Make a short video shot in Studio'].map(prompt => <button type="button" key={prompt} disabled={!ready || busy} onClick={() => { setDraft(prompt); composer.current?.focus() }}>{prompt}</button>)}
           </div>
         </div>}
         {messages.map((message, index) => (
           <article className={`message ${message.role}`} key={index}>
             <strong>{message.role === 'user' ? 'You' : engines[message.engine] || 'Hivemind'}</strong>
             {message.role === 'assistant' && <Steps steps={message.steps} />}
-            {message.text && <p>{message.text}</p>}
+            {message.text && (message.role === 'assistant' ? <RichText text={message.text} /> : <p>{message.text}</p>)}
             {(message.actions || []).map((action, at) => <ActionCard key={at} action={action} onChoose={choose} disabled={busy || choosing || opening} />)}
           </article>
         ))}
@@ -397,7 +439,8 @@ function Chat({ brandId, available, defaultEngine, opening }) {
           <article className="message assistant live" aria-live="polite">
             <strong>{engines[engine]}</strong>
             <Steps steps={live?.steps} live />
-            {live?.text ? <p>{live.text}<span className="caret" aria-hidden="true" /></p>
+            {(live?.asks || []).map(card => <AllowCard key={card.key} card={card} onAnswer={answer} />)}
+            {live?.text ? <RichText text={live.text} caret={<span className="caret" aria-hidden="true" />} />
               : <p className="chat-status working" role="status"><span className="pulse" aria-hidden="true" />{live?.steps?.length ? 'Working…' : 'Thinking…'}</p>}
           </article>
         )}
@@ -626,6 +669,7 @@ function App() {
   const [picked, setPicked] = useState(null)
   const [latest, setLatest] = useState(null)
   const [installs, setInstalls] = useState({})
+  const [working, setWorking] = useState(null)
   const holding = useRef(false)
   const drag = useRef(null)
   const panelRef = useRef(null)
@@ -683,6 +727,9 @@ function App() {
     })
     return stop
   }, [refresh])
+
+  // Which IV app the chat is working in right now (its tile shows it).
+  useEffect(() => api.onWorking(state => setWorking(state.app || null)), [])
 
   function pickMissing(app) {
     setPicked(app.id)
@@ -786,13 +833,13 @@ function App() {
         {menu.map((app, index) => {
           const state = installs[app.id]
           const busy = state && !state.done && !state.failed
-          return <AppOrb key={app.id} app={app} launch={launch} opening={opening} index={index} onMissing={pickMissing} progress={busy ? state : null} />
+          return <AppOrb key={app.id} app={app} launch={launch} opening={opening} index={index} onMissing={pickMissing} progress={busy ? state : null} working={working === app.id} />
         })}
         <button className={`agent-eye${panel === 'chat' ? ' active' : ''}`} type="button" data-solid aria-label="Open Hivemind chat"
           aria-expanded={panel === 'chat'} title="Ask Hivemind · drag to move"
           onPointerDown={grab} onPointerMove={move} onPointerUp={release} onPointerCancel={release} onClick={eyeClick}>
           <span className="eye-image"><img src={logo} alt="" draggable="false" /></span>
-          <span className="eye-label">Ask Hivemind</span>
+          <span className="eye-label">{working ? `Working in ${appNames[working]}` : 'Ask Hivemind'}</span>
         </button>
         <div className="dock-bar" data-solid>
           <label className="business"><span className="sr-only">Business</span>

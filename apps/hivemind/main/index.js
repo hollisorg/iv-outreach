@@ -12,10 +12,12 @@ import { modelList } from './models.js'
 import { openMemory } from '../../../src/service/iv-memory.js'
 import { memoryActions } from './memory-tools.js'
 import { PASTE_PROMPT, gatherMaterial, importSources, parseSuggestions, runDistill } from './memory-import.js'
+import { appTools } from './app-tools.js'
 
 const directory = dirname(fileURLToPath(import.meta.url))
 let window
 let chat
+let router
 // The program is called IV Hivemind; its data stays in %APPDATA%\Hivemind so saved chats and settings carry over.
 app.setName('IV Hivemind')
 app.setPath('userData', process.env.HIVEMIND_DATA_DIR || join(app.getPath('appData'), 'Hivemind'))
@@ -35,6 +37,18 @@ function coverArea(area = cursorArea()) {
   if (!window || window.isDestroyed()) return
   const now = window.getBounds()
   if (now.x !== area.x || now.y !== area.y || now.width !== area.width || now.height !== area.height) window.setBounds(area)
+  shapeWindow()
+}
+
+// While the pointer is over a control the overlay takes clicks, and to Windows it is then a plain opaque rectangle
+// over the whole screen. Chrome and Edge treat a window fully covered by one as hidden and stop drawing its video
+// (YouTube froze whenever Hivemind was dragged). A window region with one corner pixel left out is not a simple
+// rectangle, so browsers' occlusion checks skip the overlay. Nothing visible changes.
+function shapeWindow() {
+  if (!window || window.isDestroyed()) return
+  const { width, height } = window.getContentBounds()
+  if (width < 2 || height < 2) return
+  window.setShape([{ x: 0, y: 0, width: width - 1, height }, { x: width - 1, y: 1, width: 1, height: height - 1 }])
 }
 
 function focusWindow() {
@@ -129,7 +143,35 @@ function start() {
   const memory = () => memoryStore ||= openMemory(process.env.HIVEMIND_MEMORY_DIR || undefined)
   const memoryTools = memoryActions({ memory })
   const memoryPrompt = options => memory().prompt(options)
-  const conversation = () => chat ||= createChat({ directory: join(app.getPath('userData'), 'chat'), workspace, emit: publish, actions, memoryTools, memoryPrompt, mcpScript })
+  // The IV apps' own tools, run in chat mode. While the agent works in an app, its tile shows it, the app comes up on
+  // screen the first time something changes there, and Hivemind stays above it so the chat and its Allow cards stay
+  // in view; the keep-on-top choice is restored when the reply ends.
+  const sendWorking = state => { if (window && !window.isDestroyed()) window.webContents.send('hivemind:working', state) }
+  router = appTools({
+    programs,
+    askRoot: join(app.getPath('userData'), 'app-asks'),
+    links: () => { try { return workspace().links || {} } catch { return {} } },
+    hooks: {
+      ask: turn => turn.refresh?.(),
+      label: (turn, text) => turn.relabel?.(text),
+      using: (turn, id, { look }) => {
+        sendWorking({ app: id })
+        if (look) return
+        turn.shown ||= new Set()
+        if (turn.shown.has(id)) return
+        turn.shown.add(id)
+        // A test copy kept off screen (HIVEMIND_HIDDEN=1) doesn't bring the real apps up.
+        if (process.env.HIVEMIND_HIDDEN === '1') return
+        if (window && !window.isDestroyed() && !window.isAlwaysOnTop()) { window.setAlwaysOnTop(true, 'floating'); turn.raised = true }
+        openApp({ id, programs }).catch(() => {})
+      },
+    },
+  })
+  const turnEnded = turn => {
+    sendWorking({ app: null })
+    if (turn.raised && window && !window.isDestroyed() && !overlayPrefs().pinned) window.setAlwaysOnTop(false)
+  }
+  const conversation = () => chat ||= createChat({ directory: join(app.getPath('userData'), 'chat'), workspace, emit: publish, actions, memoryTools, memoryPrompt, mcpScript, apps: router, onTurnEnd: turnEnded })
   const brandExists = id => id === 'you' || workspace().brands.some(brand => brand.id === id)
   handle('memory-list', (brandId) => ({ you: memory().list('you'), business: brandId ? memory().list(brandId) : [] }))
   handle('memory-add', ({ scope, text, source }) => {
@@ -162,6 +204,7 @@ function start() {
   handle('models', () => modelList())
   handle('send', (request) => conversation().send(request))
   handle('choose', (request) => conversation().choose(request))
+  handle('answer', (request) => conversation().answer(request || {}))
   handle('stop', () => chat?.stop())
 
   handle('overlay', () => ({ pinned: Boolean(window.isAlwaysOnTop()) }))
@@ -189,6 +232,8 @@ function start() {
     webPreferences: { preload: join(directory, '../preload/index.cjs'), sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false },
   })
   window.setIgnoreMouseEvents(true, { forward: true })
+  shapeWindow()
+  window.on('resize', shapeWindow)
   if (overlayPrefs().pinned) window.setAlwaysOnTop(true, 'floating')
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   window.webContents.on('will-navigate', event => event.preventDefault())
@@ -209,6 +254,6 @@ if (!app.requestSingleInstanceLock()) app.quit()
 else {
   app.on('second-instance', focusWindow)
   app.whenReady().then(start)
-  app.on('before-quit', () => { chat?.stop(); chat?.close() })
+  app.on('before-quit', () => { chat?.stop(); chat?.close(); router?.close() })
   app.on('window-all-closed', () => app.quit())
 }

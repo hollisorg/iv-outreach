@@ -2,6 +2,18 @@
 
 Hivemind is a standalone Windows app for opening IV Outreach, IV Studio and IV Signal, plus IV Chat, IV Voice and IV Keys. The white IV eye opens a shared chat. The business picker filters saved handoffs, and each handoff opens in its receiving app. The chat uses an installed Claude Code or Codex session for planning and drafting with the selected workspace context.
 
+## Working in the IV apps (0.6.0, 2026-11-15)
+
+Hivemind's chat does the work in IV Outreach, IV Signal and IV Studio itself, through each app's own tools, and the person can watch.
+
+- **Router:** `main/app-tools.js` starts each installed app's MCP server from its install folder (`<app>.exe` in Node mode on `resources/app.asar/out/main/mcp.js`) in the app's own chat mode (`FITSCOUT_AGENT_RUN`, `IV_SIGNAL_AGENT_RUN`, `IV_STUDIO_AGENT_RUN` = `chat`), keeps it for a few idle minutes, and passes no keys: credentials stay in the apps. Tools that only point at the app's own window (`show_in_app`, `inspect_app`, `list_places`) are left out.
+- **Three tools instead of hundreds:** `iv_app_tools` (search an app's tools, with the app's guide), `iv_app_tool` (one tool's inputs), `iv_app_call` (run it). The agent never loads Studio's 200+ schemas at once.
+- **The apps' rules:** in chat mode each app asks before anything that approves, spends, deletes, sends or changes settings by writing an ask file and waiting for the answer. Hivemind shows each ask as an Allow card in the reply (Allow / Don't allow) and writes the answer back; a reply that ends or is stopped answers open cards with Don't allow. The card and its answer stay on the reply.
+- **Business:** the context gives the selected business's own ID in each app (from the workspace links). A call whose `business_id`/`brand_id` belongs to another business, or isn't the linked one, is refused. With All businesses selected Hivemind doesn't narrow it.
+- **Live:** steps are named after the app tool ("Signal: Draft a post"); the app's tile shows Working and the eye says "Working in Signal"; the first change in an app brings it up on screen, and Hivemind stays on top for the rest of the reply (the Keep on top choice comes back afterwards). A "Worked in Signal" card lists the tools used with Show Signal.
+- **IV memory in the apps' own chats:** `src/service/iv-memory-note.js` adds the person's memories, and the linked business's for Outreach and Signal, to each message in Outreach, Signal and Studio's own chats.
+- Checks: `test/hivemind-apps.test.mjs` (a stand-in app server in `test/fixtures`); `docs/verification/hivemind/apps-check.mjs claude|codex [--packaged]` (off screen, throwaway Signal data: brand and draft made, archive asked and declined, nothing archived).
+
 ## IV memory (0.5.0, 2026-11-15)
 
 What the person's IV apps know about them and each business, whichever agent runs the chat.
@@ -10,7 +22,7 @@ What the person's IV apps know about them and each business, whichever agent run
 - **In chat:** each message carries the memories about the person and the selected business. Two more tools, `hivemind_remember` (one short fact, about "you" or the turn's business) and `hivemind_recall` (search). A green "Remembered" card shows each save with Forget it.
 - **Memory tab** (Chat · Memory · Handoffs): About you and About <business>, each memory editable, movable between you and a business, and forgettable; an Add box.
 - **Import from your AI:** Claude Code on this PC (`~/.claude/CLAUDE.md` and each project's `memory/MEMORY.md`), Codex on this PC (`~/.codex/AGENTS.md` and `memory_summary.md`), or the Claude/ChatGPT app (a prompt to copy, then paste its answer). The person's chosen agent reads it in one tool-free turn (up to about 70k characters) and suggests up to 40 short memories; the person ticks, edits and files them before anything is saved (`main/memory-import.js`).
-- **Not yet:** IV Outreach, IV Studio and IV Signal chats don't read IV memory yet; they need the shared module and a context line each.
+- **In the other apps:** from 0.6.0 the IV Outreach, IV Signal and IV Studio chats read it too (see above); only Hivemind adds to it.
 - Checks: `test/hivemind-memory.test.mjs`; `docs/verification/hivemind/memory-check.mjs claude|codex` (off screen, throwaway store: saved preference, recalled in a new thread, Memory tab, import of 40 suggestions from Claude Code's files and saving them).
 
 ## Chat harness (0.4.0, 2026-11-15)
@@ -35,6 +47,7 @@ Hivemind has no window frame. It is a transparent, borderless window covering th
 - Dock bar under the eye: business picker, Handoffs (with a count), Keep on top (remembered in `overlay.json`), Minimize and Close. Drag the eye to move the whole dock; its place is remembered.
 - The eye opens a dark glass panel on the side with more room, with Chat and Handoffs tabs. Esc closes it. Enter sends; Shift+Enter adds a line.
 - Motion: the eye fades in, the tiles spring out from it and drift, threads flow to them, the panel slides in from the eye's side. Reduced motion turns all of it off.
+- Browser video (0.6.0): while the pointer is over a control the overlay takes clicks and, to Windows, became a plain opaque rectangle over the whole screen, so Chrome and Edge treated a browser under it as covered and stopped drawing its video (YouTube froze while Hivemind was dragged). The window now has a region with one corner pixel left out (`shapeWindow` in `main/index.js`), which browsers' occlusion checks skip. `docs/verification/hivemind/shape-check.mjs` checks the packaged window's region in both states.
 - If the screen layout changes, the window refits to its display. Launching Hivemind again moves it to the screen the mouse is on.
 
 Check: `docs/verification/hivemind/overlay-check.mjs <win.ps1 helper> [--packaged]` drives the real desktop (it moves the mouse and takes screen captures, so run it only when nobody is using the PC, and don't keep the captures if other apps are on screen).

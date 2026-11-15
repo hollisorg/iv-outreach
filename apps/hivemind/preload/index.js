@@ -17,6 +17,12 @@ contextBridge.exposeInMainWorld('hivemind', {
   importRun: (request) => ipcRenderer.invoke('hivemind:import-run', request),
   send: (request) => ipcRenderer.invoke('hivemind:send', request),
   choose: (request) => ipcRenderer.invoke('hivemind:choose', request),
+  answer: (request) => ipcRenderer.invoke('hivemind:answer', request),
+  onWorking: (listener) => {
+    const receive = (_event, state) => listener(state)
+    ipcRenderer.on('hivemind:working', receive)
+    return () => ipcRenderer.removeListener('hivemind:working', receive)
+  },
   stop: () => ipcRenderer.invoke('hivemind:stop'),
   overlay: () => ipcRenderer.invoke('hivemind:overlay'),
   install: (id) => ipcRenderer.invoke('hivemind:install', id),

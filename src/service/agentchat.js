@@ -2,6 +2,7 @@
 // One headless turn per message, continuing the agent's own session. Every IV Outreach tool plus web research; anything
 // that approves outreach, cancels messages or changes the sender profile waits for the person's Allow card
 // (agentrun.js chatAsk, mcp/server.js askPerson).
+import { ivMemoryNote } from './iv-memory-note.js'
 import fs from 'node:fs'
 import path from 'node:path'
 import { AGENT_NAMES, SERVER, claudeArgs, codexChatArgs, killTree, parseLine, spawnAgent, stepLabel } from './agentrun.js'
@@ -91,7 +92,9 @@ export function startChatTurn({ engine, exe, dir, session = null, message, conte
   for (const f of fs.readdirSync(askDir)) fs.rmSync(path.join(askDir, f), { force: true })
   const env = { ...mcp.env, ...extraEnv, FITSCOUT_AGENT_RUN: 'chat', FITSCOUT_AGENT_ASK: askDir }
   const server = { command: mcp.command, args: mcp.args, env }
-  const text = `${context ? `${contextLine(context)}\n` : ''}${message}`
+  // What the person's IV apps know about them (and this business), kept in IV Hivemind.
+  const remembered = ivMemoryNote({ app: 'outreach', localId: context?.businessId })
+  const text = `${context ? `${contextLine(context)}\n` : ''}${remembered ? `${remembered}\n` : ''}${message}`
   let args
   let input
   if (engine === 'claude') {
