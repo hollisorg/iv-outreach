@@ -67,7 +67,7 @@ export function businesses({ root = process.env.IV_WORKSPACE_DIR || workspaceDir
   function share({ app, localId }) {
     if (!Object.hasOwn(NATIVE, app)) throw new Error('Choose IV Outreach or IV Signal.')
     const item = nativeBusinesses(app).find(entry => entry.id === localId)
-    if (!item) throw new Error(`That business isn't in ${NATIVE[app].name} anymore.`)
+    if (!item) throw new Error(`That one isn't in ${NATIVE[app].name} anymore.`)
     return withStore(app, w => {
       const existing = w.link(localId)
       if (existing) return w.brand(existing.brandId)

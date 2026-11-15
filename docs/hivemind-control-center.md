@@ -4,6 +4,8 @@ Hivemind is a standalone Windows app for opening IV Outreach, IV Studio and IV S
 
 ## One business across the IV apps (0.7.0, 2026-11-15)
 
+People see these shared businesses as **profiles** (0.7.1, Matthew's call; "projects" was dropped because IV Studio has its own Projects): the switcher, the Profiles tab, the pop-up ("One profile everywhere") and the in-app handoff panel say profile. Code, IPC and storage keep the business/brand names, and the chat agent is told that profile and business mean the same thing.
+
 The person picks the business they're working on once, in Hivemind, and every IV app follows it with its memory.
 
 - **Active business:** the shared workspace keeps it (`active()`/`setActive()` in `src/service/iv-workspace.js`, meta key `active`; `''` means all businesses). Hivemind's dock switcher and the Businesses tab set it.

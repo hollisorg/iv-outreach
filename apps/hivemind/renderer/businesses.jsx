@@ -32,23 +32,23 @@ export function BusinessSwitcher({ brands, brandId, onPick, onManage }) {
   const pick = id => { setOpen(false); if (id !== brandId) onPick(id) }
   return (
     <div className="switcher" ref={box}>
-      <button type="button" className="switch-button" aria-haspopup="listbox" aria-expanded={open} aria-label={`Business: ${current?.name || 'All businesses'}`}
-        title="Every IV app works on this business" onClick={() => setOpen(value => !value)}>
+      <button type="button" className="switch-button" aria-haspopup="listbox" aria-expanded={open} aria-label={`Profile: ${current?.name || 'All profiles'}`}
+        title="Every IV app works on this profile" onClick={() => setOpen(value => !value)}>
         <BusinessMark brand={current} size={20} />
-        <span>{current?.name || 'All businesses'}</span>
+        <span>{current?.name || 'All profiles'}</span>
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 10l4-4 4 4" /></svg>
       </button>
       {open && (
-        <div className="switch-menu" role="listbox" aria-label="Choose a business">
+        <div className="switch-menu" role="listbox" aria-label="Choose a profile">
           <small>Every IV app works on</small>
           {[null, ...brands].map(brand => (
             <button type="button" role="option" key={brand?.id || 'all'} aria-selected={(brand?.id || '') === brandId} onClick={() => pick(brand?.id || '')}>
               <BusinessMark brand={brand} />
-              <span>{brand?.name || 'All businesses'}</span>
+              <span>{brand?.name || 'All profiles'}</span>
               {(brand?.id || '') === brandId && <i aria-hidden="true">✓</i>}
             </button>
           ))}
-          <button type="button" className="switch-manage" onClick={() => { setOpen(false); onManage() }}>Manage businesses</button>
+          <button type="button" className="switch-manage" onClick={() => { setOpen(false); onManage() }}>Manage profiles</button>
         </div>
       )}
     </div>
@@ -90,10 +90,10 @@ function BusinessForm({ start, onSaved, onCancel }) {
       ))}
       {problem && <p className="install-error" role="alert">{problem}</p>}
       <div className="install-actions">
-        <button className="primary" disabled={busy || !form.name.trim()}>{busy ? 'Saving…' : start?.id ? 'Save' : 'Add business'}</button>
+        <button className="primary" disabled={busy || !form.name.trim()}>{busy ? 'Saving…' : start?.id ? 'Save' : 'Add profile'}</button>
         <button type="button" className="quiet" disabled={busy} onClick={onCancel}>Cancel</button>
       </div>
-      <p className="biz-note">IV Outreach and IV Signal update their copy of this business when they're open. Studio and every app's chat use it right away.</p>
+      <p className="biz-note">IV Outreach and IV Signal update their copy of this profile when they're open. Studio and every app's chat use it right away.</p>
     </form>
   )
 }
@@ -125,7 +125,7 @@ export function Businesses({ activeId, onPick, onChanged }) {
     <div className="businesses">
       <div className="biz-top">
         <p>Pick one and every IV app works on it, with its memory.</p>
-        <button type="button" className="quiet" onClick={() => setEditing('new')}>New business</button>
+        <button type="button" className="quiet" onClick={() => setEditing('new')}>New profile</button>
       </div>
       {problem && <p className="install-error" role="alert">{problem}</p>}
       {!state && <p className="empty-note">Loading…</p>}
@@ -139,7 +139,7 @@ export function Businesses({ activeId, onPick, onChanged }) {
                 <strong>{brand.name}</strong>
                 {brand.website && <small>{brand.website.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}</small>}
                 <span className="biz-apps">
-                  {Object.keys(appShort).map(app => <span key={app} className={brand.apps[app] ? 'yes' : ''} title={brand.apps[app] ? `${appShort[app]} has its copy` : `${appShort[app]} makes its copy the first time you work on this business`}>{appShort[app]}</span>)}
+                  {Object.keys(appShort).map(app => <span key={app} className={brand.apps[app] ? 'yes' : ''} title={brand.apps[app] ? `${appShort[app]} has its copy` : `${appShort[app]} makes its copy the first time you work on this profile`}>{appShort[app]}</span>)}
                   <span className="yes" title="Studio and every chat use the shared profile">Studio</span>
                 </span>
               </div>

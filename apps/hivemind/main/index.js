@@ -202,13 +202,13 @@ function start() {
   handle('businesses', () => profiles.list())
   handle('active', () => profiles.active())
   handle('set-active', (brandId) => {
-    if (brandId && !workspace().brands.some(brand => brand.id === brandId)) throw new Error('Choose a business available in Hivemind.')
+    if (brandId && !workspace().brands.some(brand => brand.id === brandId)) throw new Error('Choose a profile available in Hivemind.')
     return profiles.setActive(brandId || '')
   })
   handle('business-save', (request) => profiles.save(request || {}))
   handle('business-share', (request) => profiles.share(request || {}))
   handle('business-logo', async () => {
-    const choice = await dialog.showOpenDialog(window, { title: 'Choose a logo for this business', properties: ['openFile'], filters: [{ name: 'Logo under 4 MB', extensions: ['png', 'jpg', 'jpeg', 'webp'] }] })
+    const choice = await dialog.showOpenDialog(window, { title: 'Choose a logo for this profile', properties: ['openFile'], filters: [{ name: 'Logo under 4 MB', extensions: ['png', 'jpg', 'jpeg', 'webp'] }] })
     return choice.canceled ? null : profiles.addLogo(choice.filePaths[0])
   })
   handle('threads', (brandId) => conversation().list(brandId || ''))

@@ -31,7 +31,7 @@ test('threads: create, rename, model, agent switch drops the session, delete', (
   const created = chat.create({ brandId: brand, engine: 'claude', model: 'claude-sonnet-5-5' })
   const id = created.thread.id
   assert.equal(created.thread.model, 'claude-sonnet-5-5')
-  assert.throws(() => chat.create({ brandId: 'not-a-business' }), /business/)
+  assert.throws(() => chat.create({ brandId: 'not-a-business' }), /profile available/)
   assert.throws(() => chat.create({ brandId: brand, model: 'bad model; rm' }), /model/)
 
   // Simulate a finished turn that left a session behind.

@@ -564,7 +564,7 @@ function MemoryImport({ brands, available, defaultEngine, onDone, onCancel }) {
     return (
       <div className="memory-import">
         <h3>Suggested memories</h3>
-        <p className="install-note">{suggestions.length ? 'Untick anything you don’t want, fix the wording, and file each one under you or a business. Nothing is saved until you press Save.' : 'Nothing new to add: IV memory already has everything it suggested.'}</p>
+        <p className="install-note">{suggestions.length ? 'Untick anything you don’t want, fix the wording, and file each one under you or a profile. Nothing is saved until you press Save.' : 'Nothing new to add: IV memory already has everything it suggested.'}</p>
         <ul className="suggestions">
           {suggestions.map((item, index) => (
             <li key={index} className={item.keep ? '' : 'off'}>
@@ -844,7 +844,7 @@ function App() {
   const panelLeft = side === 'left' ? Math.max(16, cx - panelGap - panelWidth) : Math.min(width - panelWidth - 16, cx + panelGap)
   const panelTop = clamp(cy - panelHeight / 2, 16, height - panelHeight - 16)
   const items = brandId ? data.handoffs.filter(item => item.brandId === brandId) : data.handoffs
-  const brandName = data.brands.find(brand => brand.id === brandId)?.name || 'All businesses'
+  const brandName = data.brands.find(brand => brand.id === brandId)?.name || 'All profiles'
 
   return (
     <div className={`overlay${dragging ? ' is-dragging' : ''}`}>
@@ -899,13 +899,13 @@ function App() {
 
       {panel && (
         <aside ref={panelRef} className={`panel from-${side}${closing ? ' closing' : ''}`} data-solid
-          style={{ left: panelLeft, top: panelTop, width: panelWidth }} aria-label={panel === 'chat' ? 'Chat panel' : panel === 'memory' ? 'Memory panel' : panel === 'businesses' ? 'Businesses panel' : 'Handoffs panel'}>
+          style={{ left: panelLeft, top: panelTop, width: panelWidth }} aria-label={panel === 'chat' ? 'Chat panel' : panel === 'memory' ? 'Memory panel' : panel === 'businesses' ? 'Profiles panel' : 'Handoffs panel'}>
           <header className="panel-head">
             <div className="tabs" role="tablist">
               <button type="button" role="tab" aria-selected={panel === 'chat'} className={panel === 'chat' ? 'on' : ''} onClick={() => setPanel('chat')}>Chat</button>
               <button type="button" role="tab" aria-selected={panel === 'memory'} className={panel === 'memory' ? 'on' : ''} onClick={() => setPanel('memory')}>Memory</button>
               <button type="button" role="tab" aria-selected={panel === 'handoffs'} className={panel === 'handoffs' ? 'on' : ''} onClick={() => setPanel('handoffs')}>Handoffs <span className="count">{items.length}</span></button>
-              <button type="button" role="tab" aria-selected={panel === 'businesses'} className={panel === 'businesses' ? 'on' : ''} onClick={() => setPanel('businesses')}>Businesses</button>
+              <button type="button" role="tab" aria-selected={panel === 'businesses'} className={panel === 'businesses' ? 'on' : ''} onClick={() => setPanel('businesses')}>Profiles</button>
             </div>
             <button type="button" className="tool" aria-label="Close panel" title="Close (Esc)" onClick={closePanel}>
               <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
