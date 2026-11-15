@@ -1,5 +1,5 @@
-// Hydrodesk-inspired category scans, adapted to IV's existing local Maps source.
-// No Hydrodesk service, paid Google Places, or fabricated intent/urgency scores.
+// Category scans over IV's local Maps source: saved searches, history and deduplication.
+// No paid Google Places and no made-up intent or urgency scores.
 import { searchGoogleMaps } from './gmaps.js'
 import { getCampaign } from './campaigns.js'
 import { getSetting,setSetting,tx,now,newId } from './db.js'

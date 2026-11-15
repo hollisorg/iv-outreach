@@ -18,7 +18,7 @@ const MODES=[
  {id:'local',tag:'A city. A market. New possibilities.',title:'Local markets',about:'Explore a place by business type. Bring back public listings to review with your agent.',needs:'A location + business types',art:localArt},
  {id:'agent',tag:'Start with who you want to reach.',title:'Agent research',about:'Let Claude Code or Codex research businesses, check their websites and explain the fit.',needs:'Your campaign + your agent',art:agentArt},
  {id:'custom',tag:'Follow something specific.',title:'Custom search',about:'Have a niche in mind? Go straight to Maps with your own business search and location.',needs:'A search phrase + a place',art:customArt},
- {id:'premium',tag:'Optional extra reach.',title:'Premium discovery',about:'Find company pages or structured local listings. Review a credit quote before any paid search.',needs:'Premium + connected data services',art:premiumArt,paid:true},
+ {id:'premium',tag:'Coming soon.',title:'Premium discovery',about:'Company pages and structured local listings from paid data services. Coming in a later version.',needs:'Paid data services',art:premiumArt,paid:true,soon:true},
  {id:'watch',tag:'Notice the right moment.',title:'Watchlists & news',about:'Follow website changes and public news feeds. Keep useful reasons to reconnect close at hand.',needs:'A business page or RSS feed',art:watchArt},
  {id:'brief',tag:'One idea. Your IV ecosystem.',title:'Content briefs',about:'Bring your brand, audience and research together for IV Studio and IV Signal.',needs:'Your campaign + a content goal',art:briefArt},
 ]
@@ -29,7 +29,7 @@ export default function Scanning({campaign,go,notify,openChat}){
   {!selected?<>
    <header className="scan-stage" style={{'--scan-art':`url("${heroArt}")`}}><div className="scan-stage-orbit" aria-hidden="true"/><div><p className="eyebrow">Infinite Variance / Discovery</p><h1>Scanning</h1><p>Find your next conversation.</p></div></header>
    <div className="scan-intro"><h2>Find a lead. Start something useful.</h2><p>Discover businesses, understand opportunities and turn research into your next conversation.</p></div>
-   <div className="scan-workflow-cards">{MODES.map(m=><button key={m.id} data-guide={`scan-${m.id}`} className="scan-workflow-card" aria-label={m.title} onClick={()=>setMode(m.id)} style={{'--scan-art':`url("${m.art}")`}}><span className="scan-card-art" aria-hidden="true"/><span className="eyebrow">{m.tag}</span><strong>{m.title}</strong><span className="scan-card-about">{m.about}</span><span className="scan-card-needs"><b>Needs</b> {m.needs}</span><span className="scan-card-footer">{m.paid?'Optional credits':'Free workspace tool'} <i aria-hidden="true">↗</i></span></button>)}</div>
+   <div className="scan-workflow-cards">{MODES.map(m=><button key={m.id} data-guide={`scan-${m.id}`} className={`scan-workflow-card${m.soon?' scan-soon':''}`} aria-label={m.soon?`${m.title}, coming soon`:m.title} disabled={m.soon} onClick={()=>!m.soon&&setMode(m.id)} style={{'--scan-art':`url("${m.art}")`}}><span className="scan-card-art" aria-hidden="true"/><span className="eyebrow">{m.tag}</span><strong>{m.title}</strong><span className="scan-card-about">{m.about}</span><span className="scan-card-needs"><b>Needs</b> {m.needs}</span><span className="scan-card-footer">{m.soon?'Coming soon':'Free workspace tool'} {!m.soon&&<i aria-hidden="true">↗</i>}</span></button>)}</div>
   </>:<header className="scan-tool-head"><button className="btn btn-quiet" onClick={()=>setMode(null)}>← All scans</button><div><p className="eyebrow">{selected.paid?'Premium':'Free workspace'} / {selected.tag}</p><h1>{selected.title}</h1><p>{selected.about}</p></div></header>}
   {!campaign?<div className="scan-empty"><h2>Every search starts with a brief.</h2><p>Create a campaign with your agent, then choose where to look.</p><button className="btn btn-primary" onClick={openChat}>Open my agent</button></div>:<ScanWorkspace key={campaign.id} {...{campaign,go,notify,openChat,mode}}/>}
  </div>
@@ -43,7 +43,7 @@ function ScanWorkspace({campaign,go,notify,openChat,mode}){
     {mode==='local'&&<BusinessScanner {...{campaign,notify,openChat,go}} onDone={reload}/>}
     {mode==='agent'&&<Discovery campaign={campaign} openChat={openChat}/>}
     {['opportunity','watch','brief'].includes(mode)&&<GrowthWorkspace key={mode} {...{mode,campaign,notify,openChat}}/>}
-    {mode==='premium'&&<PremiumDiscovery {...{campaign,notify,go}}/>}
+    {mode==='premium'&&!selected?.soon&&<PremiumDiscovery {...{campaign,notify,go}}/>}
     {mode==='custom'&&<section className="discovery-panel"><p className="eyebrow">Your own search</p><h2>Follow a specific lead.</h2><MapsSearch campaign={campaign} notify={notify} onDone={reload} initiallyOpen/><p className="small dim">Public Maps listings. No IV credits used. Results go to Leads for review.</p></section>}
    </div></>}
   {running&&<div className="scan-live" role="status"><span className="scan-live-line"/><strong>Exploring {running.area||'your market'}</strong><p className="small dim">{state?.categories?.[running.current]||'Starting'} · {running.completed||0} of {running.categories?.length||1} categories checked</p></div>}

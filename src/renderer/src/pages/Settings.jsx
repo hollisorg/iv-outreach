@@ -22,7 +22,7 @@ const TOPICS = [
   ['businesses', 'Businesses', 'Brands, audiences and campaigns.'],
   ['agent', 'Your agent', 'Your personal agent connection, shared across businesses.'],
   ['research', 'Research', 'Choose how you discover and understand opportunities.'],
-  ['premium', 'Premium & credits', 'Your Premium account and credits are shared across this workspace.'],
+  ['premium', 'Premium', 'Coming soon.'],
   ['sender', 'Sender profile', 'Shared across all businesses. Check the sender before approving outreach for a different brand.'],
   ['mailbox', 'Mailbox', 'One connected mailbox on this PC, shared across businesses.'],
   ['connections', 'Other apps', 'Use this workspace with your other agents.'],

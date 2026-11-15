@@ -5,6 +5,10 @@ import { writeFileSync,readFileSync,rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
 import endpoint from './premium-endpoint.json' with {type:'json'}
+// Premium (paid contact data and extra reach) is not offered yet. While this is false, every Premium action is
+// refused, agents don't get the paid tools, and the window shows Coming soon.
+export const PREMIUM_AVAILABLE = false
+export const PREMIUM_SOON = 'Premium is coming soon. Everything in IV Outreach today is free with your own Claude Code, Codex or Hermes.'
 function localConnection(){try{const value=JSON.parse(readFileSync(join(process.env.APPDATA||join(homedir(),'.config'),'IVOutreachPremiumTest','connection.json'),'utf8'));return value.url==='http://127.0.0.1:4319'&&/^\w{64}$/.test(value.token)?value:null}catch{return null}}
 export class PremiumClient {
   constructor({readSession,writeSession,base=process.env.IV_PREMIUM_API_URL||endpoint.url||localConnection()?.url||'',fetcher=fetch}){this.readSession=readSession;this.writeSession=writeSession;this.fetch=fetcher;this.base=base.replace(/\/$/,'');this.refreshing=null

@@ -15,7 +15,7 @@ import {
   attachmentOf, withAttachments, MAX_ATTACH, ATTACH_EXTENSIONS,
 } from '../service/agentchat.js'
 import { skillMarkdown, pasteMessage } from '../service/agent.js'
-import { PremiumClient, startPremiumBridge } from '../service/premium.js'
+import { PremiumClient, startPremiumBridge, PREMIUM_AVAILABLE, PREMIUM_SOON } from '../service/premium.js'
 
 import { startUiBridge, UI_SNAPSHOT, MASK_SCREEN, UNMASK_SCREEN } from '../service/ui-guide.js'
 import { PLACES, guidePlaces } from '../renderer/src/guides.js'
@@ -706,6 +706,12 @@ const METHODS = {
     return true
   },
 }
+// Premium is coming soon: its status says so and every other Premium action is refused.
+if (!PREMIUM_AVAILABLE) for (const name of Object.keys(METHODS).filter(n => n.startsWith('premium'))) {
+  METHODS[name] = name === 'premiumStatus'
+    ? () => ({ configured: false, coming_soon: true, signed_in: false, premium: false, available: 0, history: [], jobs: [], capabilities: [], message: PREMIUM_SOON })
+    : () => { throw new Error(PREMIUM_SOON) }
+}
 
 ipcMain.handle('fitscout:call', async (_event, method, args) => {
   if (![win?.webContents, chatWindow?.webContents].includes(_event.sender) || _event.senderFrame !== _event.sender.mainFrame) throw new Error('Untrusted app window')
@@ -788,7 +794,7 @@ else {
       updateTimer = setInterval(checkUpdates, 6 * 60 * 60 * 1000)
     }
     try { uiBridgeServer=await startUiBridge({places:()=>guidePlaces(),inspect:inspectUi,show:showUi}) } catch { /* Ordinary chat remains available. */ }
-    try { premiumBridgeServer=await startPremiumBridge(fs.defaultDataDir(),{status:()=>premium.status(),quote:paidQuote,run:paidRun,job:paidJob,cancel:({job_id})=>premium.request(`/v1/jobs/${encodeURIComponent(job_id)}/cancel`,{})}) } catch { /* Free research remains available if the optional Premium bridge cannot start. */ }
+    if (PREMIUM_AVAILABLE) try { premiumBridgeServer=await startPremiumBridge(fs.defaultDataDir(),{status:()=>premium.status(),quote:paidQuote,run:paidRun,job:paidJob,cancel:({job_id})=>premium.request(`/v1/jobs/${encodeURIComponent(job_id)}/cancel`,{})}) } catch { /* Free research remains available if the optional Premium bridge cannot start. */ }
     // the mail worker: a send attempt every 30 s (each send still waits the mailbox's minimum gap), replies every 5 min
     setInterval(() => mailTick().catch(() => {}), 30000)
     setInterval(() => replyTick().catch(() => {}), 5 * 60000)

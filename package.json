@@ -1,7 +1,7 @@
 {
   "name": "fitscout",
   "productName": "IV Outreach",
-  "version": "0.13.0",
+  "version": "0.13.1",
   "description": "Desktop lead finder: describe your ideal customer, Claude finds and researches matching businesses, drafts personal outreach for your approval, and ranks who replies.",
   "author": "The Hollis Organization",
   "license": "MIT",
@@ -19,13 +19,11 @@
     "start": "electron-vite preview",
     "test": "node --test --test-concurrency=1 \"test/*.test.mjs\"",
     "mcp": "node src/mcp/server.js",
-    "premium:server": "npm --prefix server start",
     "premium:demo": "node scripts/premium-demo.mjs",
     "premium:check": "node scripts/premium-ui-check.mjs",
     "chat-smoke": "node scripts/chat-smoke.mjs",
     "dist": "electron-vite build && electron-builder --win --x64 --publish never",
     "dist:dir": "electron-vite build && electron-builder --win --x64 --dir --publish never",
-    "premium:local": "node server/local-runner.mjs",
     "vendor:restore": "node scripts/restore-vendor.mjs"
   },
   "dependencies": {

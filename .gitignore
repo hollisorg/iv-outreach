@@ -31,3 +31,21 @@ premium-jobs.json
 chats/
 backups/
 .DS_Store
+
+# Kept on this PC only, never published: working notes, internal docs, the Premium billing backend and
+# its local test tools (Premium is coming soon).
+AGENTS.md
+docs/
+integrations/
+server/
+/*.cmd
+scripts/premium-demo.mjs
+scripts/premium-fixture.mjs
+scripts/premium-ui-check.mjs
+scripts/premium-upgrade-check.mjs
+scripts/local-premium-ui-check.mjs
+scripts/start-local-test.mjs
+scripts/growth-ui-check.mjs
+test/premium.test.mjs
+test/local-premium.test.mjs
+test/discovery-providers.test.mjs
