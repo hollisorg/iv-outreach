@@ -196,6 +196,8 @@ h1, h2, h3, p { margin: 0; }
 .tabs { display: flex; gap: 4px; padding: 3px; border-radius: 999px; background: rgba(255, 255, 255, .05); }
 .tabs button { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); font: 800 17px/1 var(--display); text-transform: uppercase; letter-spacing: .03em; transition: background .25s, color .25s; }
 .tabs button.on { background: var(--red-deep); color: #fff8f3; }
+.tabs button.tab-icon { padding: 0 9px; }
+.tabs button.tab-icon svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; }
 .tabs button:not(.on):hover { color: var(--ink); }
 .panel-meta { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 16px 10px; border-bottom: 1px solid rgba(255, 255, 255, .06); }
 .panel-meta .for { font: 10.5px var(--mono); color: #ffaaa9; text-transform: uppercase; letter-spacing: .1em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

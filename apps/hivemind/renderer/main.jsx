@@ -955,7 +955,9 @@ function App() {
               <button type="button" role="tab" aria-selected={panel === 'memory'} className={panel === 'memory' ? 'on' : ''} onClick={() => setPanel('memory')}>Memory</button>
               <button type="button" role="tab" aria-selected={panel === 'handoffs'} className={panel === 'handoffs' ? 'on' : ''} onClick={() => setPanel('handoffs')}>Handoffs <span className="count">{items.length}</span></button>
               <button type="button" role="tab" aria-selected={panel === 'businesses'} className={panel === 'businesses' ? 'on' : ''} onClick={() => setPanel('businesses')}>Profiles</button>
-              <button type="button" role="tab" aria-selected={panel === 'settings'} className={panel === 'settings' ? 'on' : ''} onClick={() => setPanel('settings')}>Settings</button>
+              <button type="button" role="tab" aria-selected={panel === 'settings'} aria-label="Settings" title="Settings and updates" className={`tab-icon${panel === 'settings' ? ' on' : ''}`} onClick={() => setPanel('settings')}>
+                <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.2" /><path d="M8 1.8v1.7M8 12.5v1.7M1.8 8h1.7M12.5 8h1.7M3.6 3.6l1.2 1.2M11.2 11.2l1.2 1.2M3.6 12.4l1.2-1.2M11.2 4.8l1.2-1.2" /></svg>
+              </button>
             </div>
             <button type="button" className="tool" aria-label="Close panel" title="Close (Esc)" onClick={closePanel}>
               <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
