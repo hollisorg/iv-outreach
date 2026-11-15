@@ -38,8 +38,9 @@ test('only apps with a public feed are installable', () => {
   assert.equal(installInfo('chat').installable, true)
   assert.equal(installInfo('downloader').installable, true)
   assert.equal(installInfo('keys').installable, false)
-  for (const id of ['voice', 'outreach']) assert.equal(installInfo(id).installable, false)
-  assert.match(installInfo('outreach').note, /private test/)
+  for (const id of ['voice', 'outreach']) assert.equal(installInfo(id).installable, true)
+  assert.equal(CATALOG.voice.feed, 'https://github.com/hollisorg/iv-voice/releases/latest/download/')
+  assert.equal(CATALOG.outreach.feed, 'https://github.com/hollisorg/iv-outreach/releases/latest/download/')
 })
 
 test('a checked download installs; a tampered or oversized one never runs', async () => {
@@ -74,7 +75,7 @@ test('a checked download installs; a tampered or oversized one never runs', asyn
   assert.equal(runs.length, 1, 'nothing ran after a failed check')
   assert.equal(existsSync(join(tempDir, 'IV-Chat-Setup.exe')), false)
 
-  await assert.rejects(installApp({ id: 'outreach', name: 'IV Outreach', programs: tempDir, tempDir, run }), /private test/)
+  await assert.rejects(installApp({ id: 'keys', name: 'IV Keys', programs: tempDir, tempDir, run }), /can.t be installed from here/)
 })
 
 test('the menu offers IV Downloader in place of IV Keys', async () => {

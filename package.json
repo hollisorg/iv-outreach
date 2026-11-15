@@ -4,7 +4,7 @@
   "version": "0.12.4",
   "description": "Desktop lead finder: describe your ideal customer, Claude finds and researches matching businesses, drafts personal outreach for your approval, and ranks who replies.",
   "author": "The Hollis Organization",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "engines": {
@@ -99,7 +99,6 @@
         "provider": "github",
         "owner": "hollisorg",
         "repo": "iv-outreach",
-        "private": true,
         "releaseType": "release"
       }
     ],

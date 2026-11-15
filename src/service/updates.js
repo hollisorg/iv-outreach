@@ -3,7 +3,9 @@ import { promisify } from 'node:util'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 
-export const UPDATE_REPOSITORY = { provider: 'github', owner: 'hollisorg', repo: 'iv-outreach', private: true }
+// Releases come from the public repo, so no key or sign-in is needed. While the repo is still private, the person's
+// GitHub CLI sign-in is used as a fallback (and never stored or returned).
+export const UPDATE_REPOSITORY = { provider: 'github', owner: 'hollisorg', repo: 'iv-outreach' }
 const run = promisify(execFile)
 
 // Use the person's existing GitHub credentials only in the main process. Never persist or return the token.
@@ -22,12 +24,13 @@ export async function githubUpdateToken() {
 }
 
 export class AppUpdates {
-  constructor({ updater, version, supported, token = githubUpdateToken, onChange = () => {}, now = () => new Date().toISOString() }) {
-    this.updater = updater; this.token = token; this.onChange = onChange; this.now = now
+  constructor({ updater, version, supported, token = githubUpdateToken, onChange = () => {}, now = () => new Date().toISOString(), automatic = () => true }) {
+    this.updater = updater; this.token = token; this.onChange = onChange; this.now = now; this.automatic = automatic; this.quiet = false
     this.state = { version, phase: supported ? 'idle' : 'unsupported', availableVersion: null, progress: 0, checkedAt: null, message: supported ? 'Check for a newer version of IV Outreach.' : 'Updates are available in the installed Windows app.' }
     this.supported = supported; this.pending = null
     updater.autoDownload = false
-    updater.autoInstallOnAppQuit = false
+    // A downloaded update installs when IV Outreach closes; Restart and install does it now.
+    updater.autoInstallOnAppQuit = true
     updater.allowDowngrade = false
     updater.allowPrerelease = false
     updater.disableDifferentialDownload = true
@@ -35,26 +38,36 @@ export class AppUpdates {
     updater.on('update-available', info => this.set({ phase: 'available', availableVersion: info.version, message: `Version ${info.version} is available.` }))
     updater.on('update-not-available', () => this.set({ phase: 'current', availableVersion: null, message: 'You have the latest release.' }))
     updater.on('download-progress', p => this.set({ phase: 'downloading', progress: Math.max(0, Math.min(100, Math.round(p.percent || 0))), message: 'Downloading your update…' }))
-    updater.on('update-downloaded', info => this.set({ phase: 'ready', availableVersion: info.version, progress: 100, message: 'Your update is ready. Restart when it suits you.' }))
-    updater.on('error', () => this.fail())
+    updater.on('update-downloaded', info => this.set({ phase: 'ready', availableVersion: info.version, progress: 100, message: 'Your update is ready. It installs when you close IV Outreach, or restart now.' }))
+    updater.on('error', () => { if (!this.quiet) this.fail() })
   }
   status() { return { ...this.state } }
   set(patch) { Object.assign(this.state, patch); this.onChange(this.status()); return this.status() }
-  fail() { return this.set({ phase: 'error', progress: 0, message: 'Could not complete the update. Check your connection and GitHub access, then try again.' }) }
+  fail() { return this.set({ phase: 'error', progress: 0, message: 'Could not complete the update. Check your connection, then try again. It also tries again by itself.' }) }
   check() {
     if (!this.supported || ['ready', 'installing', 'downloading'].includes(this.state.phase)) return Promise.resolve(this.status())
     if (this.pending) return this.pending
     this.set({ phase: 'checking', availableVersion: null, progress: 0, message: 'Checking for updates…' })
     this.pending = (async () => {
       try {
-        const token = await this.token()
-        if (!token) return this.set({ phase: 'auth-required', message: 'Private test updates need GitHub CLI signed in to an account with access to hollisorg/iv-outreach. Run gh auth login, then check again.' })
         // Fixed destination; no URL or credentials supplied by renderer/MCP callers.
-        this.updater.setFeedURL({ ...UPDATE_REPOSITORY, token })
-        await this.updater.checkForUpdates()
-        return this.set({ checkedAt: this.now() })
+        try {
+          this.quiet = true
+          this.updater.setFeedURL({ ...UPDATE_REPOSITORY })
+          await this.updater.checkForUpdates()
+        } catch {
+          this.quiet = false
+          const token = await this.token()
+          if (!token) return this.fail()
+          this.updater.setFeedURL({ ...UPDATE_REPOSITORY, private: true, token })
+          await this.updater.checkForUpdates()
+        } finally { this.quiet = false }
+        this.set({ checkedAt: this.now() })
       } catch { return this.fail() }
       finally { this.pending = null }
+      // New versions download by themselves unless the person turned automatic updates off.
+      if (this.state.phase === 'available' && this.automatic()) return this.download()
+      return this.status()
     })()
     return this.pending
   }

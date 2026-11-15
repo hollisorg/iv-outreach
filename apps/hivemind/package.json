@@ -4,7 +4,7 @@
   "version": "0.7.3",
   "description": "The desktop overlay for IV Outreach, IV Studio, IV Signal, IV Chat, IV Voice and IV Downloader.",
   "author": "The Hollis Organization",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "main": "out/main/index.js",

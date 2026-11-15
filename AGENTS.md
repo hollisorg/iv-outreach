@@ -10,7 +10,7 @@ B2B lead-gen company with a US trademark filing) was too close. fitscout.com was
 A quick web and trademark search found no conflict, but there has been no legal clearance. Owner: Matthew Hollis
 (The Hollis Organization).
 **Closed personal test, not for sale** (Matthew, 2026-11-12). Licensing no longer blocks tools; see Hard rules for what stays out.
-Folder: C:\Users\Matthew\Desktop\IVOutreach (private remote: https://github.com/hollisorg/iv-outreach). Installer: dist\IV-Outreach-Setup-<version>.exe.
+Repository: https://github.com/hollisorg/iv-outreach (MIT). Installer: dist\IV-Outreach-Setup-<version>.exe.
 Use IVOutreach for new working paths. The former fitscout desktop path is retained for compatibility with existing Codex projects. This folder rename does not change the installed app's stable data directory, app ID, or MCP tool names.
 
 ## What it is
@@ -110,8 +110,8 @@ himself before outreach. Nothing sends without approval. Commit/push only on his
 
 User authorized optional paid subscriptions/credits while preserving all free agent tools. server/ is a separate
 Node 24 SQLite billing/provider service, excluded from the desktop package. Stripe TEST catalog was created in
-The Hollis Organization Inc acct_1L9wOnADnzKPQPbv: premium price_1Ub4F7ADnzKPQPbvov3vsOZD (USD49/500 monthly credits),
-topup price_1Ub4FBADnzKPQPbvhV2qIes9 (USD10/100). No live charges. Backend hosting, Supabase email OTP, runtime Stripe
+The test Stripe account (server/local-test.json): premium price (USD49/500 monthly credits),
+topup price (USD10/100). No live charges. Backend hosting, Supabase email OTP, runtime Stripe
 test key/webhook, provider contracts and keys remain unconnected. Never embed those service secrets in Electron.
 src/service/premium-endpoint.json is unset; UI accurately shows Premium unconnected. scripts/premium-demo.mjs uses
 only an isolated fictional in-memory service. Supabase account creation occurs only when the user requests sign-in;

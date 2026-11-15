@@ -10,9 +10,9 @@ export const CATALOG = {
   studio: { feed: 'https://github.com/hollisorg/iv-studio/releases/latest/download/', page: 'https://github.com/hollisorg/iv-studio/releases/latest' },
   signal: { feed: 'https://github.com/hollisorg/iv-signal-releases/releases/latest/download/', page: 'https://github.com/hollisorg/iv-signal-releases/releases/latest' },
   chat: { feed: 'https://github.com/hollisorg/iv-chat/releases/latest/download/', page: 'https://github.com/hollisorg/iv-chat/releases/latest' },
-  voice: { page: 'https://github.com/hollisorg/iv-voice', note: 'IV Voice has no public download yet.' },
+  voice: { feed: 'https://github.com/hollisorg/iv-voice/releases/latest/download/', page: 'https://github.com/hollisorg/iv-voice/releases/latest' },
   downloader: { feed: 'https://github.com/hollisorg/iv-downloader/releases/latest/download/', page: 'https://github.com/hollisorg/iv-downloader/releases/latest' },
-  outreach: { note: 'IV Outreach is in a private test and can’t be downloaded yet.' },
+  outreach: { feed: 'https://github.com/hollisorg/iv-outreach/releases/latest/download/', page: 'https://github.com/hollisorg/iv-outreach/releases/latest' },
 }
 
 // The small part of electron-builder's latest.yml Hivemind needs: the installer file, its size and SHA-512.

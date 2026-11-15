@@ -1,7 +1,6 @@
 # Hydrodesk outreach review and adaptation
 
-Reviewed the user's local Hydrodesk snapshot, read-only:
-`C:\Users\Matthew\Documents\ChatGPT\migrate\tmp\hydro-sales-8001760\app\main.py`.
+Reviewed a local snapshot of Hydrodesk, an earlier Hollis sales tool, read-only.
 This is the October deployment snapshot, not proof that current Hydrodesk production has identical code. No Hydrodesk production code, data, settings, API keys, or integrations were changed.
 
 Useful source workflows:

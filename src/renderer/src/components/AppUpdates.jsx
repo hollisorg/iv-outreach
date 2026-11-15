@@ -23,7 +23,7 @@ export default function AppUpdates({ notify }) {
     finally { setWorking(false) }
   }
   return <div className="app-updates">
-    <div className="update-version"><span className="eyebrow">IV Outreach</span><strong>Version {state.version}</strong><span className="small dim">Private test releases</span></div>
+    <div className="update-version"><span className="eyebrow">IV Outreach</span><strong>Version {state.version}</strong><span className="small dim">Public releases on GitHub</span></div>
     <p role="status">{state.message}</p>
     {state.phase === 'downloading' && <div><progress aria-label="Update download" value={state.progress} max="100"/><span className="mono"> {state.progress}%</span></div>}
     <div className="update-actions">
@@ -31,8 +31,8 @@ export default function AppUpdates({ notify }) {
       {state.phase === 'available' && <button className="btn primary" disabled={busy} onClick={() => action('updatesDownload')}>Download {state.availableVersion}</button>}
       {state.phase === 'ready' && <button className="btn primary" disabled={busy} onClick={() => action('updatesInstall')}>Restart and install</button>}
     </div>
-    <label className="update-auto"><input type="checkbox" checked={state.automaticChecks} disabled={working} onChange={e => action('updatesPreferences', { automaticChecks: e.target.checked })}/><span>Check for new versions automatically</span></label>
-    <p className="small dim">You choose when to download and restart. Your businesses, campaigns and chat history stay on this PC.</p>
+    <label className="update-auto"><input type="checkbox" checked={state.automaticChecks} disabled={working} onChange={e => action('updatesPreferences', { automaticChecks: e.target.checked })}/><span>Update automatically</span></label>
+    <p className="small dim">New versions download in the background and install when you close IV Outreach, or restart now to use one sooner. Your businesses, campaigns and chat history stay on this PC.</p>
     {state.checkedAt && <p className="small dim">Last checked: {new Date(state.checkedAt).toLocaleString()}</p>}
   </div>
 }

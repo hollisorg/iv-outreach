@@ -781,7 +781,7 @@ else {
       send('workspace:active', { businessId: localId })
     } })
     createWindow()
-    appUpdates = new AppUpdates({ updater: updaterPackage.autoUpdater, version: app.getVersion(), supported: app.isPackaged && process.platform === 'win32', onChange: () => send('updates:changed', updatesStatus()) })
+    appUpdates = new AppUpdates({ updater: updaterPackage.autoUpdater, version: app.getVersion(), supported: app.isPackaged && process.platform === 'win32', automatic: () => readSettings().automaticUpdateChecks !== false, onChange: () => send('updates:changed', updatesStatus()) })
     const checkUpdates = () => { if (readSettings().automaticUpdateChecks !== false) appUpdates.check().catch(() => {}) }
     if (app.isPackaged) {
       updateStartup = setTimeout(checkUpdates, 20000)

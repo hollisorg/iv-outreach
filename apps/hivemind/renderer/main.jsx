@@ -647,6 +647,39 @@ function Memory({ brandId, brandName, brands, available, defaultEngine }) {
   )
 }
 
+const updateWords = {
+  dev: 'Updates work in the installed app.',
+  idle: 'Hivemind checks for a new version when it opens and every few hours.',
+  checking: 'Checking for a new version…',
+  current: 'You have the newest version.',
+}
+
+// Hivemind updates itself from its public releases on GitHub; this shows where that stands and lets the person check now.
+function Settings({ update }) {
+  const [checking, setChecking] = useState(false)
+  const u = update || { status: 'idle' }
+  const words = u.status === 'error' ? u.error || 'Couldn’t check for updates.'
+    : u.status === 'downloading' ? `Downloading version ${u.available}${u.percent ? ` (${Math.round(u.percent)}%)` : ''}…`
+    : u.status === 'ready' ? `Version ${u.available} is downloaded. Restart to use it, or it installs when you close Hivemind.`
+    : updateWords[u.status] || updateWords.idle
+  const check = async () => { setChecking(true); try { await api.checkUpdate() } finally { setChecking(false) } }
+  return (
+    <div className="memory settings">
+      <section className="memory-section">
+        <h3>Updates</h3>
+        <p className="install-note">IV Hivemind updates itself from its public releases on GitHub, with no account needed. New versions download in the background.</p>
+        <div className="settings-version"><strong>Version {u.version || '…'}</strong><span role="status">{words}</span></div>
+        <div className="install-actions">
+          {u.status === 'ready'
+            ? <button type="button" className="primary" onClick={() => api.installUpdate()}>Restart to update</button>
+            : <button type="button" className="primary" disabled={checking || u.status === 'checking' || u.status === 'downloading' || u.status === 'dev'} onClick={check}>{u.status === 'checking' || checking ? 'Checking…' : 'Check for updates'}</button>}
+        </div>
+        {u.checkedAt && <p className="install-note">Last checked {new Date(u.checkedAt).toLocaleString()}</p>}
+      </section>
+    </div>
+  )
+}
+
 function readDock() {
   try {
     const saved = JSON.parse(localStorage.getItem(dockKey))
@@ -896,6 +929,9 @@ function App() {
             <button type="button" className={`tool${pinned ? ' on' : ''}`} aria-pressed={pinned} aria-label={pinned ? 'Stop keeping Hivemind on top' : 'Keep Hivemind on top'} title={pinned ? 'Kept on top' : 'Keep on top'} onClick={() => windowAction(pinned ? 'unpin' : 'pin')}>
               <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 1.8h5l-.8 4.3 2.6 2.4v1H8.6v4.7L8 15l-.6-.8V9.5H4.7v-1l2.6-2.4z" /></svg>
             </button>
+            <button type="button" className={`tool${panel === 'settings' ? ' on' : ''}`} aria-label="Hivemind settings" title="Settings and updates" aria-expanded={panel === 'settings'} onClick={() => openPanel('settings')}>
+              <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.2" /><path d="M8 1.8v1.7M8 12.5v1.7M1.8 8h1.7M12.5 8h1.7M3.6 3.6l1.2 1.2M11.2 11.2l1.2 1.2M3.6 12.4l1.2-1.2M11.2 4.8l1.2-1.2" /></svg>
+            </button>
             <button type="button" className="tool" aria-label="Minimize Hivemind" title="Minimize" onClick={() => windowAction('minimize')}>
               <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5h9" /></svg>
             </button>
@@ -912,13 +948,14 @@ function App() {
 
       {panel && (
         <aside ref={panelRef} className={`panel from-${side}${closing ? ' closing' : ''}`} data-solid
-          style={{ left: panelLeft, top: panelTop, width: panelWidth }} aria-label={panel === 'chat' ? 'Chat panel' : panel === 'memory' ? 'Memory panel' : panel === 'businesses' ? 'Profiles panel' : 'Handoffs panel'}>
+          style={{ left: panelLeft, top: panelTop, width: panelWidth }} aria-label={panel === 'chat' ? 'Chat panel' : panel === 'memory' ? 'Memory panel' : panel === 'businesses' ? 'Profiles panel' : panel === 'settings' ? 'Settings panel' : 'Handoffs panel'}>
           <header className="panel-head">
             <div className="tabs" role="tablist">
               <button type="button" role="tab" aria-selected={panel === 'chat'} className={panel === 'chat' ? 'on' : ''} onClick={() => setPanel('chat')}>Chat</button>
               <button type="button" role="tab" aria-selected={panel === 'memory'} className={panel === 'memory' ? 'on' : ''} onClick={() => setPanel('memory')}>Memory</button>
               <button type="button" role="tab" aria-selected={panel === 'handoffs'} className={panel === 'handoffs' ? 'on' : ''} onClick={() => setPanel('handoffs')}>Handoffs <span className="count">{items.length}</span></button>
               <button type="button" role="tab" aria-selected={panel === 'businesses'} className={panel === 'businesses' ? 'on' : ''} onClick={() => setPanel('businesses')}>Profiles</button>
+              <button type="button" role="tab" aria-selected={panel === 'settings'} className={panel === 'settings' ? 'on' : ''} onClick={() => setPanel('settings')}>Settings</button>
             </div>
             <button type="button" className="tool" aria-label="Close panel" title="Close (Esc)" onClick={closePanel}>
               <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
@@ -926,7 +963,8 @@ function App() {
           </header>
           {panel === 'memory' && <Memory brandId={brandId || ''} brandName={brandName} brands={data.brands} available={data.engines} defaultEngine={engine} key={brandId || 'all'} />}
           {panel === 'businesses' && <Businesses activeId={brandId || ''} onPick={pickBusiness} onChanged={refresh} />}
-          {panel === 'memory' || panel === 'businesses' ? null : panel === 'chat'
+          {panel === 'settings' && <Settings update={update} />}
+          {panel === 'memory' || panel === 'businesses' || panel === 'settings' ? null : panel === 'chat'
             ? <Chat brandId={brandId || ''} available={data.engines} defaultEngine={engine} opening={opening} key={brandId || 'all'} />
             : <>
               <div className="panel-meta"><span className="for">{brandName}</span></div>

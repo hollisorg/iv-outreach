@@ -1,7 +1,7 @@
 # Bundled third-party tools
 
-IV Outreach is a closed personal test (not for sale), per Matthew, 2026-11-12. These tools are shipped inside the
-installer under `resources/vendor`. Retain license files when packaging.
+IV Outreach is open source under the MIT licence (since 2026-11-15). These tools are shipped inside the installer
+under `resources/vendor` under their own licences below. Retain their license files when packaging.
 
 | Path | What | Source | License | Integrity |
 |---|---|---|---|---|

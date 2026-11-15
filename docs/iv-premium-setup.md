@@ -4,12 +4,12 @@ The desktop free tools work without this service. `server/` is a separate backen
 
 ## Verified Stripe TEST catalog
 
-Account: The Hollis Organization Inc, `acct_1L9wOnADnzKPQPbv`. The reconnected Test Account for Hollis was verified November 12, 2026. These prices exist in test mode:
+Account: the test Stripe account named in `server/local-test.json` (git-ignored). The reconnected Test Account for Hollis was verified November 12, 2026. These prices exist in test mode:
 
 | Item | Price | Credits | Stripe price |
 | --- | --- | --- | --- |
-| Premium monthly | USD 49/month | 500 per paid billing period | `price_1Ub4F7ADnzKPQPbvov3vsOZD` |
-| Extra credits | USD 10 once | 100 | `price_1Ub4FBADnzKPQPbvhV2qIes9` |
+| Premium monthly | USD 49/month | 500 per paid billing period | `STRIPE_PREMIUM_PRICE_ID` |
+| Extra credits | USD 10 once | 100 | `STRIPE_TOPUP_PRICE_ID` |
 
 One sandbox subscription and a sandbox credit top-up were completed on November 12, 2026. Real signed Stripe test webhooks credited 500 + 100 credits to the local ledger. No live charges or provider purchases were created. Prices are a test configuration, not a final public pricing commitment. Monthly credits expire at the invoice period end; purchased extra credits do not expire. Paid services require an active paid subscription. Cancellation at period end retains paid access through that end. Past-due, unpaid, expired, or billing-review accounts cannot start paid work. Free research remains available.
 

@@ -5,7 +5,7 @@ The renderer's existing bridge identifiers remain unchanged for compatibility.
 
 ## Reference and assets
 
-Reference: `C:\Users\Matthew\AppData\Local\Programs\IV Studio\resources\app.asar`.
+Reference: `%LOCALAPPDATA%\Programs\IV Studio\resources\app.asar`.
 The parent agent viewed the installed application through native computer use. Its packaged CSS and static assets were
 then read with `@electron/asar`; the installed package declares `license: MIT`, author Infinite Variance.
 Matthew explicitly requested use of this app's visual styling.

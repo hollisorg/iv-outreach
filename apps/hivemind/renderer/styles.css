@@ -228,6 +228,9 @@ select option { background: #1d1418; color: var(--ink); }
 .memory, .memory-import { padding: 10px 16px 16px; overflow-y: auto; max-height: 590px; scrollbar-width: thin; scrollbar-color: rgba(255, 120, 130, .3) transparent; user-select: text; }
 .memory-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .memory-head .quiet { margin-top: 0; flex: none; }
+.settings-version { margin-top: 12px; display: grid; gap: 4px; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, .06); background: rgba(255, 255, 255, .04); }
+.settings-version strong { font: 800 18px/1 var(--display); text-transform: uppercase; letter-spacing: .03em; }
+.settings-version span { font-size: 13px; color: var(--muted); }
 .memory-notice { margin-top: 10px; padding: 8px 11px; border-radius: 10px; background: rgba(111, 196, 154, .14); color: #c9f1db; font-size: 13px; }
 .memory-section { margin-top: 16px; }
 .memory-section h3 { display: flex; align-items: center; gap: 8px; font: 800 18px/1 var(--display); text-transform: uppercase; letter-spacing: .03em; }

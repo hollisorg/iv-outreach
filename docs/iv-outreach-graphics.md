@@ -8,9 +8,9 @@ All original PNG outputs were copied byte-for-byte into the renderer assets dire
 
 ### outreach-hero-v1.png
 
-Workspace: `C:/Users/Matthew/Desktop/IVOutreach/src/renderer/src/assets/outreach-hero-v1.png`
+Workspace: `src/renderer/src/assets/outreach-hero-v1.png`
 
-Generated original: `C:/Users/Matthew/.codex/generated_images/01a1d131-4ee9-7f60-901b-7b5b74ee6f09/exec-378cdbcf-baae-4edc-89e3-26aa7fd60572.png`
+Generated original: kept outside the repo
 
 Exact prompt:
 
@@ -22,9 +22,9 @@ Wide panoramic 16:9 illustration, no typography or text. Deep near-black charcoa
 
 ### outreach-discovery-v1.png
 
-Workspace: `C:/Users/Matthew/Desktop/IVOutreach/src/renderer/src/assets/outreach-discovery-v1.png`
+Workspace: `src/renderer/src/assets/outreach-discovery-v1.png`
 
-Generated original: `C:/Users/Matthew/.codex/generated_images/01a1d131-4ee9-7f60-901b-7b5b74ee6f09/exec-0f4e751c-3d4f-4445-b1e4-4ad142682596.png`
+Generated original: kept outside the repo
 
 Exact prompt:
 
@@ -36,9 +36,9 @@ A single curious engraved eye looking across three floating business contact car
 
 ### outreach-approval-v1.png
 
-Workspace: `C:/Users/Matthew/Desktop/IVOutreach/src/renderer/src/assets/outreach-approval-v1.png`
+Workspace: `src/renderer/src/assets/outreach-approval-v1.png`
 
-Generated original: `C:/Users/Matthew/.codex/generated_images/01a1d131-4ee9-7f60-901b-7b5b74ee6f09/exec-c50d6d2e-e127-4e18-b81d-dc71c8fb1f25.png`
+Generated original: kept outside the repo
 
 Exact prompt:
 
@@ -50,9 +50,9 @@ A calm engraved eye in the upper-left carefully reviewing ONE folded outgoing no
 
 ### outreach-conversation-v1.png
 
-Workspace: `C:/Users/Matthew/Desktop/IVOutreach/src/renderer/src/assets/outreach-conversation-v1.png`
+Workspace: `src/renderer/src/assets/outreach-conversation-v1.png`
 
-Generated original: `C:/Users/Matthew/.codex/generated_images/01a1d131-4ee9-7f60-901b-7b5b74ee6f09/exec-620daf66-3508-45fb-82ff-433dd24f6e44.png`
+Generated original: kept outside the repo
 
 Exact prompt:
 

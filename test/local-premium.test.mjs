@@ -24,9 +24,10 @@ test('local identity is restricted to test mode on the fixed loopback listener',
 test('dedicated Stripe parser accepts CLI literal strings and never selects a live or default key',()=>{
  const file=join(mkdtempSync(join(tmpdir(),'iv-profile-test-')),'config.toml')
  for(const quote of ["'",'"']){
-  writeFileSync(file,`[default]\naccount_id = 'wrong'\ntest_mode_api_key = 'sk_test_wrong'\n[iv-outreach-test]\naccount_id = ${quote}acct_1L9wOnADnzKPQPbv${quote}\nlive_mode_api_key = 'sk_live_unused'\ntest_mode_api_key = ${quote}rk_test_fixture${quote}\n`)
-  assert.deepEqual(readTestProfile(file),{account:'acct_1L9wOnADnzKPQPbv',key:'rk_test_fixture'})
+  writeFileSync(file,`[default]\naccount_id = 'wrong'\ntest_mode_api_key = 'sk_test_wrong'\n[iv-outreach-test]\naccount_id = ${quote}acct_TESTFIXTURE${quote}\nlive_mode_api_key = 'sk_live_unused'\ntest_mode_api_key = ${quote}rk_test_fixture${quote}\n`)
+  assert.deepEqual(readTestProfile(file,'iv-outreach-test','acct_TESTFIXTURE'),{account:'acct_TESTFIXTURE',key:'rk_test_fixture'})
+  assert.throws(()=>readTestProfile(file,'iv-outreach-test','acct_OTHER'),/Sign in/)
  }
- writeFileSync(file,"[iv-outreach-test]\naccount_id = 'acct_1L9wOnADnzKPQPbv'\nlive_mode_api_key = 'sk_live_unused'\n")
- assert.throws(()=>readTestProfile(file),/Sign in/)
+ writeFileSync(file,"[iv-outreach-test]\naccount_id = 'acct_TESTFIXTURE'\nlive_mode_api_key = 'sk_live_unused'\n")
+ assert.throws(()=>readTestProfile(file,'iv-outreach-test','acct_TESTFIXTURE'),/Sign in/)
 })

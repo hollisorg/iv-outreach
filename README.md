@@ -1,6 +1,5 @@
 # IV Outreach
 
-Local project folder: `C:\Users\Matthew\Desktop\IVOutreach`. Use this path for development and the local test launcher. The old `fitscout` desktop path remains compatible with existing Codex project references; app data and agent connections retain their stable identifiers.
 
 Find and research real businesses from chat using your own **Claude Code or Codex** login. Version 0.10.0 includes
 native public-source discovery: no separate engine installation, BetterContact account or model API key required.
