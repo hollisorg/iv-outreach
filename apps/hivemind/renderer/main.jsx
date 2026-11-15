@@ -187,59 +187,133 @@ function Handoffs({ items, apps, launch, opening, brandId, refresh, refreshing }
   )
 }
 
-function Chat({ brandId, engine, available, opening }) {
+const timeAgo = value => {
+  const seconds = Math.max(1, (Date.now() - new Date(value).getTime()) / 1000)
+  if (seconds < 60) return 'just now'
+  if (seconds < 3600) return `${Math.round(seconds / 60)} min ago`
+  if (seconds < 86400) return `${Math.round(seconds / 3600)} h ago`
+  return shortDate(value)
+}
+
+function Steps({ steps, live }) {
+  if (!steps?.length) return null
+  return (
+    <ol className={`steps${live ? ' live' : ''}`} aria-label="What it did">
+      {steps.map((step, index) => (
+        <li key={index} className={`step ${step.state}`}>
+          <span className="step-mark" aria-hidden="true">{step.state === 'done' ? '✓' : step.state === 'error' ? '!' : ''}</span>
+          {step.label}
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+// The chat tab: threads for the selected business, each with its own agent and model. A thread continues its agent
+// session, replies stream in as they're written, and each step shows while it runs.
+function Chat({ brandId, available, defaultEngine, opening }) {
+  const [threads, setThreads] = useState([])
+  const [threadId, setThreadId] = useState(null)
+  const [thread, setThread] = useState(null)
   const [messages, setMessages] = useState([])
-  const [steps, setSteps] = useState([])
+  const [live, setLive] = useState(null)
+  const [busy, setBusy] = useState(false)
   const [choosing, setChoosing] = useState(false)
   const [draft, setDraft] = useState('')
-  const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
   const [problem, setProblem] = useState('')
+  const [models, setModels] = useState({ claude: [], codex: [] })
+  const [engine, setEngine] = useState(defaultEngine)
+  const [model, setModel] = useState('')
   const end = useRef(null)
   const composer = useRef(null)
-  const revision = useRef(0)
+  const current = useRef(null)
+  current.current = threadId
   const ready = available.some(item => item.id === engine && item.available)
 
-  useEffect(() => {
-    let live = true
-    setLoading(true)
-    setMessages([])
-    setProblem('')
-    const sync = data => {
-      setMessages(data.messages || [])
-      setSteps(data.steps || [])
-      setBusy(data.busy)
-      setProblem(data.problem || '')
-      setLoading(false)
-    }
-    const unsubscribe = api.onChat(data => {
-      if (data.brandId === brandId && data.engine === engine) {
-        revision.current++
-        sync(data)
-      }
-    })
-    const at = revision.current
-    api.messages(brandId, engine).then(data => {
-      if (live && revision.current === at) sync(data)
-    }).catch(error => {
-      if (live) { setProblem(error.message); setLoading(false) }
-    })
-    return () => { live = false; unsubscribe() }
-  }, [brandId, engine])
+  const loadThreads = useCallback(async (pick) => {
+    const list = await api.threads(brandId)
+    setThreads(list)
+    return pick === undefined ? list : list.find(item => item.id === pick)
+  }, [brandId])
 
-  useEffect(() => { end.current?.scrollIntoView({ block: 'nearest' }) }, [messages, busy])
-  useEffect(() => { if (!loading && ready && !busy) composer.current?.focus() }, [loading, ready, busy])
+  const open = useCallback(async (id) => {
+    setProblem('')
+    if (!id) { setThreadId(null); setThread(null); setMessages([]); setLive(null); setBusy(false); return }
+    const state = await api.thread(id)
+    setThreadId(id)
+    setThread(state.thread)
+    setEngine(state.thread.engine)
+    setModel(state.thread.model || '')
+    setMessages(state.messages)
+    setLive(state.live)
+    setBusy(state.busy)
+  }, [])
+
+  useEffect(() => { api.models().then(setModels).catch(() => {}) }, [])
+  useEffect(() => {
+    let alive = true
+    setLoading(true)
+    loadThreads().then(list => alive && open(list[0]?.id || null)).catch(error => alive && setProblem(error.message)).finally(() => alive && setLoading(false))
+    return () => { alive = false }
+  }, [brandId, loadThreads, open])
+  useEffect(() => api.onChat(data => {
+    if (data.threadId !== current.current) { if (!data.busy) loadThreads().catch(() => {}); return }
+    setMessages(data.messages || [])
+    setLive(data.live || null)
+    setBusy(Boolean(data.busy))
+    if (data.problem) setProblem(data.problem)
+    if (!data.busy) loadThreads().then(() => api.thread(data.threadId)).then(state => setThread(state.thread)).catch(() => {})
+  }), [loadThreads])
+
+  useEffect(() => { end.current?.scrollIntoView({ block: 'nearest' }) }, [messages, live, busy])
+  useEffect(() => { if (!loading && ready && !busy) composer.current?.focus() }, [loading, ready, busy, threadId])
+
+  async function newThread() {
+    if (busy) return
+    setDraft('')
+    await open(null)
+    composer.current?.focus()
+  }
+
+  async function changeEngine(next) {
+    if (thread && messages.length && next !== thread.engine &&
+      !confirm(`Switch this chat to ${engines[next]}? It carries on with the chat so far in a new ${engines[next]} session.`)) return
+    setEngine(next)
+    setModel('')
+    if (thread) setThread((await api.updateThread(thread.id, { engine: next })).thread)
+  }
+  async function changeModel(next) {
+    setModel(next)
+    if (thread) setThread((await api.updateThread(thread.id, { model: next })).thread)
+  }
+  async function removeThread() {
+    if (!thread || busy || !confirm(`Delete "${thread.title}"? This removes the chat from Hivemind.`)) return
+    await api.deleteThread(thread.id)
+    const list = await loadThreads()
+    await open(list[0]?.id || null)
+  }
 
   async function send(event) {
     event?.preventDefault()
     if (!draft.trim() || busy || loading || !ready) return
-    setBusy(true)
     setProblem('')
-    const at = revision.current
+    setBusy(true)
     try {
-      const state = await api.send({ brandId, engine, message: draft })
-      if (revision.current === at) { setMessages(state.messages); setBusy(state.busy) }
+      let id = threadId
+      if (!id) {
+        const created = await api.newThread({ brandId, engine, model })
+        id = created.thread.id
+        setThreadId(id)
+        current.current = id
+        setThread(created.thread)
+      }
+      const state = await api.send({ threadId: id, message: draft })
+      setMessages(state.messages)
+      setLive(state.live)
+      setBusy(state.busy)
       setDraft('')
+      loadThreads().catch(() => {})
     } catch (error) {
       setProblem(error.message)
       setBusy(false)
@@ -247,20 +321,45 @@ function Chat({ brandId, engine, available, opening }) {
   }
 
   async function choose(handoffId) {
-    if (busy || choosing) return
+    if (busy || choosing || !threadId) return
     setChoosing(true)
     setProblem('')
-    try {
-      const state = await api.choose({ brandId, engine, handoffId })
-      setMessages(state.messages)
-    } catch (error) { setProblem(error.message) }
+    try { setMessages((await api.choose({ threadId, handoffId })).messages) }
+    catch (error) { setProblem(error.message) }
     finally { setChoosing(false) }
   }
 
+  const modelOptions = models[engine] || []
   return (
     <section className="chat" aria-label="Hivemind chat">
+      <div className="chat-tools">
+        <label className="thread-select"><span className="sr-only">Chat</span>
+          <select aria-label="Chat" value={threadId || ''} disabled={busy} onChange={event => open(event.target.value || null)}>
+            <option value="">{threadId ? 'New chat' : 'New chat (not started)'}</option>
+            {threads.map(item => <option key={item.id} value={item.id}>{item.title} · {timeAgo(item.updatedAt)}</option>)}
+          </select>
+        </label>
+        <button type="button" className="tool" aria-label="New chat" title="New chat" disabled={busy} onClick={newThread}>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9" /></svg>
+        </button>
+        <button type="button" className="tool" aria-label="Delete this chat" title="Delete this chat" disabled={busy || !thread} onClick={removeThread}>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 4.5h9M6.5 4.5V3h3v1.5M5 4.5l.6 8.5h4.8l.6-8.5" /></svg>
+        </button>
+      </div>
+      <div className="chat-tools agent-row">
+        <label className="agent-select"><span>Agent</span>
+          <select aria-label="Agent" value={engine} disabled={busy} onChange={event => changeEngine(event.target.value)}>
+            {Object.entries(engines).map(([id, name]) => <option key={id} value={id}>{name}{available.some(item => item.id === id && item.available) ? '' : ' · unavailable'}</option>)}
+          </select>
+        </label>
+        <label className="agent-select"><span>Model</span>
+          <select aria-label="Model" value={model} disabled={busy} onChange={event => changeModel(event.target.value)}>
+            {modelOptions.map(option => <option key={option.id || 'default'} value={option.id}>{option.name}</option>)}
+          </select>
+        </label>
+      </div>
       <div className="conversation" role="log" aria-label="Conversation">
-        {!loading && !messages.length && <div className="chat-welcome">
+        {!loading && !messages.length && !live && <div className="chat-welcome">
           <span className="eye-image small"><img src={logo} alt="" /></span>
           <h2>What are you working on?</h2>
           <p>Plan work across the IV apps, draft copy, or reopen a draft or project.</p>
@@ -270,19 +369,27 @@ function Chat({ brandId, engine, available, opening }) {
         </div>}
         {messages.map((message, index) => (
           <article className={`message ${message.role}`} key={index}>
-            <strong>{message.role === 'user' ? 'You' : 'Hivemind'}</strong>
+            <strong>{message.role === 'user' ? 'You' : engines[message.engine] || 'Hivemind'}</strong>
+            {message.role === 'assistant' && <Steps steps={message.steps} />}
             {message.text && <p>{message.text}</p>}
             {(message.actions || []).map((action, at) => <ActionCard key={at} action={action} onChoose={choose} disabled={busy || choosing || opening} />)}
           </article>
         ))}
-        {busy && <p className="chat-status working" role="status"><span className="pulse" aria-hidden="true" />{steps.length ? `${steps.at(-1)}…` : `${engines[engine]} is working…`}</p>}
+        {busy && (
+          <article className="message assistant live" aria-live="polite">
+            <strong>{engines[engine]}</strong>
+            <Steps steps={live?.steps} live />
+            {live?.text ? <p>{live.text}<span className="caret" aria-hidden="true" /></p>
+              : <p className="chat-status working" role="status"><span className="pulse" aria-hidden="true" />{live?.steps?.length ? 'Working…' : 'Thinking…'}</p>}
+          </article>
+        )}
         {choosing && <p className="chat-status working" role="status"><span className="pulse" aria-hidden="true" />Opening…</p>}
         <div ref={end} />
       </div>
       {!ready && !loading && <p className="chat-status">Install and sign in to {engines[engine]} to chat here.</p>}
       {problem && <p role="alert" className="error">{problem}</p>}
       <form className="composer" onSubmit={send}>
-        <textarea ref={composer} aria-label="Message Hivemind" rows="2" maxLength="8000" placeholder="Message Hivemind…" value={draft}
+        <textarea ref={composer} aria-label="Message Hivemind" rows="2" maxLength="8000" placeholder={thread?.title && messages.length ? `Continue “${thread.title}”…` : 'Message Hivemind…'} value={draft}
           disabled={!ready || busy || loading} onChange={event => setDraft(event.target.value)}
           onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); send() } }} />
         {busy ? <button type="button" className="primary" onClick={() => api.stop()}>Stop</button> : <button className="primary" disabled={!ready || loading || !draft.trim()}>Send</button>}
@@ -316,7 +423,6 @@ function App() {
   const [installs, setInstalls] = useState({})
   const holding = useRef(false)
   const drag = useRef(null)
-  const engineChosen = useRef(false)
   const panelRef = useRef(null)
   const [panelHeight, setPanelHeight] = useState(560)
   const { width, height } = useViewport()
@@ -328,7 +434,7 @@ function App() {
       const snapshot = await api.snapshot()
       setData(snapshot)
       setBrandId(previous => previous !== null && (!previous || snapshot.brands.some(brand => brand.id === previous)) ? previous : snapshot.brands[0]?.id || '')
-      if (!engineChosen.current) setEngine(snapshot.engines.find(item => item.available)?.id || 'claude')
+      setEngine(snapshot.engines.find(item => item.available)?.id || 'claude')
       setProblem(snapshot.problem || '')
     } catch (error) { setProblem(error.message) }
     finally { setRefreshing(false) }
@@ -454,7 +560,6 @@ function App() {
   const panelTop = clamp(cy - panelHeight / 2, 16, height - panelHeight - 16)
   const items = brandId ? data.handoffs.filter(item => item.brandId === brandId) : data.handoffs
   const brandName = data.brands.find(brand => brand.id === brandId)?.name || 'All businesses'
-  const engineReady = data.engines.some(item => item.id === engine && item.available)
 
   return (
     <div className={`overlay${dragging ? ' is-dragging' : ''}`}>
@@ -524,17 +629,12 @@ function App() {
               <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
             </button>
           </header>
-          <div className="panel-meta">
-            <span className="for">{brandName}</span>
-            {panel === 'chat' && <label className="agent-select"><span>Agent</span>
-              <select aria-label="Agent" value={engine} onChange={event => { engineChosen.current = true; setEngine(event.target.value) }}>
-                {Object.entries(engines).map(([id, name]) => <option key={id} value={id}>{name}{data.engines.some(item => item.id === id && item.available) ? '' : ' · unavailable'}</option>)}
-              </select>
-            </label>}
-          </div>
           {panel === 'chat'
-            ? <Chat brandId={brandId || ''} engine={engine} available={data.engines} opening={opening} key={`${brandId}:${engine}:${engineReady}`} />
-            : <Handoffs items={items} apps={data.apps} launch={launch} opening={opening} brandId={brandId} refresh={refresh} refreshing={refreshing} />}
+            ? <Chat brandId={brandId || ''} available={data.engines} defaultEngine={engine} opening={opening} key={brandId || 'all'} />
+            : <>
+              <div className="panel-meta"><span className="for">{brandName}</span></div>
+              <Handoffs items={items} apps={data.apps} launch={launch} opening={opening} brandId={brandId} refresh={refresh} refreshing={refreshing} />
+            </>}
         </aside>
       )}
     </div>

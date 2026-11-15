@@ -204,6 +204,22 @@ h1, h2, h3, p { margin: 0; }
 select option { background: #1d1418; color: var(--ink); }
 
 .chat { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.chat-tools { position: relative; display: flex; align-items: center; gap: 4px; padding: 6px 12px 0 16px; }
+.chat-tools.agent-row { gap: 10px; padding: 8px 16px 10px; border-bottom: 1px solid rgba(255, 255, 255, .06); }
+.agent-row .agent-select { flex: 1; min-width: 0; }
+.agent-row .agent-select select { width: 100%; max-width: none; min-width: 0; text-overflow: ellipsis; }
+.thread-select { flex: 1; min-width: 0; }
+.thread-select select { width: 100%; height: 32px; padding: 0 28px 0 12px; border-radius: 999px; border: 1px solid var(--edge); background: #1c1418; font-size: 13px; text-overflow: ellipsis; }
+.agent-select select { max-width: 200px; }
+.steps { list-style: none; margin: 6px 0 2px; padding: 0; display: grid; gap: 3px; }
+.step { display: flex; align-items: center; gap: 7px; font: 11.5px/1.4 var(--mono); color: var(--muted); }
+.step-mark { display: inline-grid; place-items: center; width: 14px; height: 14px; border-radius: 50%; font-size: 9px; background: rgba(255, 255, 255, .08); color: #9fe0b2; }
+.step.run { color: var(--ink); }
+.step.run .step-mark { background: var(--red); box-shadow: 0 0 0 0 rgba(244, 72, 89, .6); animation: pulse 1.4s ease-out infinite; }
+.step.error .step-mark { background: #8a4047; color: #ffd9d3; }
+.message.live { border-color: rgba(255, 110, 122, .22); }
+.caret { display: inline-block; width: 7px; height: 1.05em; margin-left: 2px; vertical-align: -2px; background: var(--red); animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
 .conversation { flex: 1; min-height: 260px; max-height: 470px; overflow-y: auto; padding: 12px 16px 6px; scrollbar-width: thin; scrollbar-color: rgba(255, 120, 130, .3) transparent; }
 .chat-welcome { text-align: center; padding: 14px 6px 22px; animation: rise-in .5s .1s var(--ease) both; }
 .chat-welcome .eye-image { width: 78px; margin: 0 auto 6px; }

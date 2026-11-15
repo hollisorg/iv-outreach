@@ -3,7 +3,12 @@ import { contextBridge, ipcRenderer } from 'electron'
 contextBridge.exposeInMainWorld('hivemind', {
   snapshot: () => ipcRenderer.invoke('hivemind:snapshot'),
   openApp: (id, handoffId) => ipcRenderer.invoke('hivemind:open-app', id, handoffId),
-  messages: (brandId, engine) => ipcRenderer.invoke('hivemind:messages', brandId, engine),
+  threads: (brandId) => ipcRenderer.invoke('hivemind:threads', brandId),
+  thread: (id) => ipcRenderer.invoke('hivemind:thread', id),
+  newThread: (request) => ipcRenderer.invoke('hivemind:new-thread', request),
+  updateThread: (id, changes) => ipcRenderer.invoke('hivemind:update-thread', id, changes),
+  deleteThread: (id) => ipcRenderer.invoke('hivemind:delete-thread', id),
+  models: () => ipcRenderer.invoke('hivemind:models'),
   send: (request) => ipcRenderer.invoke('hivemind:send', request),
   choose: (request) => ipcRenderer.invoke('hivemind:choose', request),
   stop: () => ipcRenderer.invoke('hivemind:stop'),

@@ -8,6 +8,7 @@ import { TOOLS, appStatus, openApp, openTool, readWorkspace, toolStatus } from '
 import { createChat } from './chat.js'
 import { chatActions } from './actions.js'
 import { CATALOG, installApp, installInfo, latestRelease } from './install.js'
+import { modelList } from './models.js'
 
 const directory = dirname(fileURLToPath(import.meta.url))
 let window
@@ -121,7 +122,12 @@ function start() {
   const actions = chatActions({ readWorkspace, openApp, appStatus, programs })
   const mcpScript = app.isPackaged ? join(process.resourcesPath, 'app.asar', 'out', 'main', 'mcp.js') : join(directory, 'mcp.js')
   const conversation = () => chat ||= createChat({ directory: join(app.getPath('userData'), 'chat'), workspace, emit: publish, actions, mcpScript })
-  handle('messages', (brandId, engine) => conversation().status(brandId, engine))
+  handle('threads', (brandId) => conversation().list(brandId || ''))
+  handle('thread', (id) => conversation().view(id))
+  handle('new-thread', (request) => conversation().create(request || {}))
+  handle('update-thread', (id, changes) => conversation().update(id, changes || {}))
+  handle('delete-thread', (id) => conversation().remove(id))
+  handle('models', () => modelList())
   handle('send', (request) => conversation().send(request))
   handle('choose', (request) => conversation().choose(request))
   handle('stop', () => chat?.stop())

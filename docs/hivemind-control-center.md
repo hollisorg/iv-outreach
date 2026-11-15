@@ -2,6 +2,16 @@
 
 Hivemind is a standalone Windows app for opening IV Outreach, IV Studio and IV Signal, plus IV Chat, IV Voice and IV Keys. The white IV eye opens a shared chat. The business picker filters saved handoffs, and each handoff opens in its receiving app. The chat uses an installed Claude Code or Codex session for planning and drafting with the selected workspace context.
 
+## Chat harness (0.4.0, 2026-11-15)
+
+Hivemind is a light harness over the person's own Claude Code or Codex (their subscription), aimed at IV work: no shell, no files, only Hivemind's tools.
+
+- **Threads:** chats are threads per business (`main/chat.js`, saved in `%APPDATA%\Hivemind\chat\threads.json`; the older per-business `conversations.json` becomes threads on first run). Picker, New chat and Delete in the Chat tab.
+- **Ongoing sessions:** each thread keeps its agent session and every message continues it (Claude Code `--resume`, Codex `exec resume`). Switching a thread's agent starts a fresh session that gets the chat so far as context; changing the model keeps the session. A session the agent can't find is dropped and the next message starts fresh with the history.
+- **Live:** Claude Code replies stream token by token (`--include-partial-messages`); Codex shows each message as it completes. Tool steps show while running (pulsing) and stay on the reply (✓ or !).
+- **Models:** Claude Code's current models, or the models in the person's own Codex picker (`models_cache.json`), each led by "your default" (`main/models.js`).
+- Checks: `test/hivemind-chat.test.mjs`; `docs/verification/hivemind/harness-check.mjs claude|codex` (off screen: a third message recalls the first through the resumed session, a tool step shows live and is kept, replies stream).
+
 ## Desktop overlay (0.3.0) and the name IV Hivemind (0.3.1), 2026-11-14
 
 The program is called **IV Hivemind**: installer `IV-Hivemind-Setup-<version>.exe`, folder `%LOCALAPPDATA%\Programs\IV Hivemind`, `IV Hivemind.exe`, shortcuts and window title "IV Hivemind". The app ID (`org.hollis.hivemind`) and the data folder `%APPDATA%\Hivemind` are unchanged, so installing 0.3.1 replaced the old "Hivemind" install and kept its data. Its icon is a coral brain in the IV app style (`apps/hivemind/build/icon.ico`).
