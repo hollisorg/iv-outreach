@@ -1,0 +1,95 @@
+# Builds IV Outreach for macOS (Apple Silicon and Intel: a .dmg and a .zip each) on GitHub's Mac machines and checks
+# it (scripts/ci-mac.sh): the app bundle, the bundled Google Maps scraper, the unit tests, the MCP server through the
+# app's own binary, every page of the window, and the Mac updater end to end. The app is ad-hoc signed, not with an
+# Apple Developer ID: macOS asks people to allow it once (System Settings -> Privacy & Security -> Open Anyway), and the
+# app swaps its own bundle to update (src/main/macupdates.js) because macOS's own updater needs a Developer ID.
+# The Maps scraper: Intel uses the pinned release binary (SHA-256 checked); Apple Silicon builds the same pinned
+# commit with Go, because that release has no arm64 binary (scripts/restore-vendor.mjs).
+# Runs on pushes to the `mac` branch and by hand (Actions -> Mac -> Run workflow). With a release tag, the Mac files
+# and one latest-mac.yml for both chips are added to that release (after build.yml has published it).
+name: Mac
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Add the Mac files to this release tag (blank = build and check only)
+        required: false
+        default: ''
+  push:
+    branches: [mac]
+
+permissions:
+  contents: write
+
+jobs:
+  app:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15 # Apple Silicon
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-go@v5
+        if: matrix.arch == 'arm64'
+        with:
+          go-version: stable
+          cache: false
+      - run: npm ci
+      - name: The pinned Maps scraper for this chip
+        run: npm run vendor:restore -- --arch=${{ matrix.arch }}
+      - name: Build the app (ad-hoc signed)
+        run: npm run dist:mac -- --${{ matrix.arch }} -c.mac.identity=- -c.mac.hardenedRuntime=false
+      - name: Checks
+        run: bash scripts/ci-mac.sh
+      - run: mv dist/latest-mac.yml dist/latest-mac-${{ matrix.arch }}.yml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: iv-outreach-mac-${{ matrix.arch }}
+          path: |
+            dist/IV-Outreach-mac-${{ matrix.arch }}.dmg
+            dist/IV-Outreach-mac-${{ matrix.arch }}.dmg.blockmap
+            dist/IV-Outreach-mac-${{ matrix.arch }}.zip
+            dist/IV-Outreach-mac-${{ matrix.arch }}.zip.blockmap
+            dist/latest-mac-${{ matrix.arch }}.yml
+            ci-out/
+          if-no-files-found: warn
+
+  # One latest-mac.yml listing both architectures, so each Mac finds its own zip. (Each artifact keeps its dist/
+  # folder, so the files land in mac/dist.)
+  release:
+    needs: app
+    if: inputs.release != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: mac
+          pattern: iv-outreach-mac-*
+          merge-multiple: true
+      - name: Merge update files
+        working-directory: mac/dist
+        run: |
+          awk '/^files:/{f=1;next} /^path:/{f=0} f' latest-mac-x64.yml > x64-files.txt
+          awk -v extra="$(cat x64-files.txt)" '/^path:/{print extra} {print}' latest-mac-arm64.yml > latest-mac.yml
+          cat latest-mac.yml
+      - name: Add to the release
+        working-directory: mac/dist
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ inputs.release }}" --repo "$GITHUB_REPOSITORY" --clobber \
+            IV-Outreach-mac-*.dmg IV-Outreach-mac-*.zip IV-Outreach-mac-*.blockmap latest-mac.yml

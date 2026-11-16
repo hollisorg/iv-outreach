@@ -13,6 +13,7 @@ data/
 .env*
 !server/.env.example
 vendor/gmaps/*.exe
+vendor/gmaps/google_maps_scraper
 build/icon-256.png
 .runtime/
 vendor/uv/*.exe

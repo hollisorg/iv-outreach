@@ -1,5 +1,5 @@
-// Google Maps / Google Business Profile listings as a lead source, through gosom/google-maps-scraper (MIT; the Windows
-// binary lives in vendor/gmaps). Fast mode: one search around a point, about 20 businesses with category, address,
+// Google Maps / Google Business Profile listings as a lead source, through gosom/google-maps-scraper (MIT; the binary
+// for the platform lives in vendor/gmaps: google_maps_scraper.exe on Windows, google_maps_scraper on a Mac). Fast mode: one search around a point, about 20 businesses with category, address,
 // phone, website, rating and review count. Runs locally; no API key.
 import { spawn } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
@@ -12,14 +12,17 @@ import { normUrl, domainOf } from './normalize.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 
+export const SCRAPER = process.platform === 'win32' ? 'google_maps_scraper.exe' : 'google_maps_scraper'
 export function scraperPath() {
   const candidates = [
     process.env.FITSCOUT_GMAPS_EXE,
     // packaged app: resources/vendor/gmaps; dev: repo/vendor/gmaps (src/core -> repo root, or out/main -> repo root)
-    process.resourcesPath && join(process.resourcesPath, 'vendor', 'gmaps', 'google_maps_scraper.exe'),
+    process.resourcesPath && join(process.resourcesPath, 'vendor', 'gmaps', SCRAPER),
     // the MCP server runs the app's exe in Node mode, where resourcesPath may be unset: resources sits beside the exe
-    join(dirname(process.execPath), 'resources', 'vendor', 'gmaps', 'google_maps_scraper.exe'),
-    join(here, '..', '..', 'vendor', 'gmaps', 'google_maps_scraper.exe'),
+    // (Contents/Resources beside Contents/MacOS in a Mac app bundle)
+    join(dirname(process.execPath), 'resources', 'vendor', 'gmaps', SCRAPER),
+    join(dirname(process.execPath), '..', 'Resources', 'vendor', 'gmaps', SCRAPER),
+    join(here, '..', '..', 'vendor', 'gmaps', SCRAPER),
   ].filter(Boolean)
   return candidates.find((p) => existsSync(p)) || null
 }
@@ -73,7 +76,7 @@ export function placeToLead(p, query) {
 
 export async function searchGoogleMaps(db, { campaign_id, query, near, lat, lng, radius_m = 10000, zoom = 14, limit = 20 }) {
   const exe = scraperPath()
-  if (!exe) throw new Error('The Google Maps scraper isn\'t installed (vendor/gmaps/google_maps_scraper.exe).')
+  if (!exe) throw new Error(`The Google Maps scraper isn't installed (vendor/gmaps/${SCRAPER}).`)
   if (!query || !String(query).trim()) throw new Error('Give a search, like "plumbers in Westerville, Ohio".')
   let point = lat != null && lng != null ? { lat: Number(lat), lng: Number(lng), label: null } : null
   if (!point) point = await geocode(near || query.replace(/^.*?\bin\b\s+/i, ''))

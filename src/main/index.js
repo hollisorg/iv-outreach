@@ -6,7 +6,7 @@ import { existsSync, writeFileSync, mkdirSync, readFileSync, renameSync } from '
 import { homedir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import * as fs from '../core/index.js'
-import { findHarnesses, codexWindow } from '../service/harness.js'
+import { findHarnesses, codexWindow, EXTRA_BIN } from '../service/harness.js'
 import { findHermes } from '../service/hermesacp.js'
 import { AGENT_INFO, runInstall, openSignIn, signedIn } from '../service/agentinstall.js'
 import { AGENT_NAMES } from '../service/agentrun.js'
@@ -23,7 +23,8 @@ import { importBrandImage, brandImage } from '../service/brand-assets.js'
 import { tx } from '../core/db.js'
 import { onboardingStatus, saveOnboarding, finishOnboarding } from '../service/onboarding.js'
 import updaterPackage from 'electron-updater'
-import { AppUpdates } from '../service/updates.js'
+import { AppUpdates, UPDATE_REPOSITORY } from '../service/updates.js'
+import { MacAppUpdates } from './macupdates.js'
 import { createLeadPreview, webDestination } from '../service/lead-preview.js'
 import * as growth from '../core/opportunities.js'
 import {runOpportunityAudit,stopOpportunityAudit,auditBrowser} from '../service/opportunity-audit.js'
@@ -32,6 +33,9 @@ import {MailOAuth} from '../service/mail-oauth.js'
 const leadPreview = createLeadPreview(nativeImage)
 
 const here = dirname(fileURLToPath(import.meta.url))
+// An app opened from Finder gets a short PATH (/usr/bin:/bin:/usr/sbin:/sbin), so Claude Code, Codex, Hermes and what
+// they need (node, git) would not be found; add the usual install folders, as IV Studio does.
+if (process.platform === 'darwin') process.env.PATH = [...new Set([...String(process.env.PATH || '').split(':'), ...EXTRA_BIN()].filter(Boolean))].join(':')
 let db
 let win
 let chatWindow = null
@@ -118,7 +122,7 @@ const isSocialLink = (url) => {
   }
 }
 
-// --- Mailbox password: encrypted with the OS (DPAPI on Windows) through safeStorage, never written in plain text ---
+// --- Mailbox password: encrypted with the OS (DPAPI on Windows, the Keychain on a Mac) through safeStorage, never written in plain text ---
 function mailPassword() {
   const enc = readSettings().mailPassEnc
   if (!enc || !safeStorage.isEncryptionAvailable()) return null
@@ -196,7 +200,7 @@ function writeSettings(patch) {
 
 const mailOAuth=new MailOAuth({
   read:()=>{const enc=readSettings().mailOAuthEnc;if(!enc||!safeStorage.isEncryptionAvailable())return null;try{return JSON.parse(safeStorage.decryptString(Buffer.from(enc,'base64')))}catch{return null}},
-  write:value=>{if(!safeStorage.isEncryptionAvailable())throw Error('Secure storage is unavailable on this PC.');writeSettings({mailOAuthEnc:safeStorage.encryptString(JSON.stringify(value)).toString('base64')})},
+  write:value=>{if(!safeStorage.isEncryptionAvailable())throw Error(process.platform === 'darwin' ? 'The macOS Keychain is unavailable to IV Outreach.' : 'Secure storage is unavailable on this PC.');writeSettings({mailOAuthEnc:safeStorage.encryptString(JSON.stringify(value)).toString('base64')})},
   open:url=>shell.openExternal(url),
 })
 const premium = new PremiumClient({
@@ -464,7 +468,7 @@ const METHODS = {
   mailOAuthDisconnect:()=>{if(mailState.busy||checking)throw Error('Wait for the mailbox task to finish.');fs.saveMailbox(getDb(),{auto_send:false});return mailOAuth.disconnect()},
   saveMailbox: (patch) => fs.saveMailbox(getDb(), patch),
   setMailPassword: ({ password }) => {
-    if (!safeStorage.isEncryptionAvailable()) throw new Error('This PC can\'t encrypt the password, so IV Outreach won\'t store it.')
+    if (!safeStorage.isEncryptionAvailable()) throw new Error(process.platform === 'darwin' ? 'The macOS Keychain isn\'t available to IV Outreach, so it won\'t store the password.' : 'This PC can\'t encrypt the password, so IV Outreach won\'t store it.')
     if (!password) throw new Error('Enter the password first')
     writeSettings({ mailPassEnc: safeStorage.encryptString(String(password)).toString('base64') })
     transport = null
@@ -787,10 +791,13 @@ else {
       send('workspace:active', { businessId: localId })
     } })
     createWindow()
-    appUpdates = new AppUpdates({ updater: updaterPackage.autoUpdater, version: app.getVersion(), supported: app.isPackaged && process.platform === 'win32', automatic: () => readSettings().automaticUpdateChecks !== false, onChange: () => send('updates:changed', updatesStatus()) })
+    // a packaged Mac copy swaps its own app bundle (macupdates.js); electron-updater's Mac path needs an Apple Developer ID
+    appUpdates = process.platform === 'darwin' && app.isPackaged
+      ? new MacAppUpdates({ version: app.getVersion(), releases: `https://github.com/${UPDATE_REPOSITORY.owner}/${UPDATE_REPOSITORY.repo}/releases`, testFeed: process.env.IV_OUTREACH_UPDATE_FEED || null, selftest: process.env.IV_OUTREACH_UPDATE_SELFTEST === '1', automatic: () => readSettings().automaticUpdateChecks !== false, onChange: () => send('updates:changed', updatesStatus()) })
+      : new AppUpdates({ updater: updaterPackage.autoUpdater, version: app.getVersion(), supported: app.isPackaged && process.platform === 'win32', automatic: () => readSettings().automaticUpdateChecks !== false, onChange: () => send('updates:changed', updatesStatus()) })
     const checkUpdates = () => { if (readSettings().automaticUpdateChecks !== false) appUpdates.check().catch(() => {}) }
     if (app.isPackaged) {
-      updateStartup = setTimeout(checkUpdates, 20000)
+      updateStartup = setTimeout(checkUpdates, process.env.IV_OUTREACH_UPDATE_SELFTEST === '1' ? 1000 : 20000)
       updateTimer = setInterval(checkUpdates, 6 * 60 * 60 * 1000)
     }
     try { uiBridgeServer=await startUiBridge({places:()=>guidePlaces(),inspect:inspectUi,show:showUi}) } catch { /* Ordinary chat remains available. */ }

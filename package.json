@@ -24,7 +24,8 @@
     "chat-smoke": "node scripts/chat-smoke.mjs",
     "dist": "electron-vite build && electron-builder --win --x64 --publish never",
     "dist:dir": "electron-vite build && electron-builder --win --x64 --dir --publish never",
-    "vendor:restore": "node scripts/restore-vendor.mjs"
+    "vendor:restore": "node scripts/restore-vendor.mjs",
+    "dist:mac": "electron-vite build && electron-builder --mac --publish never"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",
@@ -32,6 +33,7 @@
     "chrome-launcher": "1.2.3",
     "electron-updater": "6.8.11",
     "imapflow": "^2.11.0",
+    "js-yaml": "4.3.2",
     "lighthouse": "13.6.0",
     "linkedom": "0.18.15",
     "mailparser": "^3.14.3",
@@ -91,6 +93,19 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "artifactName": "IV-Outreach-Setup-${version}.exe"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "build/icon.png",
+      "category": "public.app-category.business",
+      "artifactName": "IV-Outreach-mac-${arch}.${ext}",
+      "minimumSystemVersion": "12.0"
+    },
+    "dmg": {
+      "title": "IV Outreach"
     },
     "publish": [
       {

@@ -30,7 +30,10 @@ export async function auditProxy(){
  await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve)})
  return {port:server.address().port,close(){for(const s of sockets)s.destroy();server.close()}}
 }
-export function auditBrowser(){return [process.env.PROGRAMFILES,process.env['PROGRAMFILES(X86)'],process.env.LOCALAPPDATA].filter(Boolean).flatMap(root=>[join(root,'Google','Chrome','Application','chrome.exe'),join(root,'Microsoft','Edge','Application','msedge.exe')]).find(existsSync)||null}
+// Chrome or Edge for Lighthouse: Program Files or the user's folder on Windows; the app bundles in /Applications (or
+// ~/Applications) on a Mac.
+export function auditBrowser(){if(process.platform==='darwin')return [['Google Chrome','Google Chrome'],['Microsoft Edge','Microsoft Edge'],['Chromium','Chromium'],['Brave Browser','Brave Browser']].flatMap(([app,bin])=>['/Applications',join(process.env.HOME||'','Applications')].map(dir=>join(dir,`${app}.app`,'Contents','MacOS',bin))).find(existsSync)||null
+return [process.env.PROGRAMFILES,process.env['PROGRAMFILES(X86)'],process.env.LOCALAPPDATA].filter(Boolean).flatMap(root=>[join(root,'Google','Chrome','Application','chrome.exe'),join(root,'Microsoft','Edge','Application','msedge.exe')]).find(existsSync)||null}
 let running=false,activeTask=null
 export async function stopOpportunityAudit(){if(!activeTask)return;const task=activeTask;task.canceled=true;task.cancel?.();await task.done}
 export async function runOpportunityAudit(url){

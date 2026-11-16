@@ -843,3 +843,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--signal-ink); box
 @media(max-width:1100px){.growth-scores,.growth-findings,.growth-candidates{grid-template-columns:repeat(2,minmax(0,1fr))}.growth-workspace{padding:20px}}
 @media(max-width:700px){.growth-findings,.growth-candidates{grid-template-columns:1fr}.growth-intro{gap:12px}.growth-step{flex-basis:42px;height:42px;font-size:18px}}
 @media(prefers-reduced-motion:reduce){.growth-progress{animation:none}}
+
+/* a Mac: the traffic lights sit at the left of the title bar (trafficLightPosition in main), nothing at the right */
+html.mac .titlebar-brand { padding-left: 84px; }
+html.mac .titlebar-mid { padding-right: 16px; }
