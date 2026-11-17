@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/hollisorg/iv-outreach/releases/latest"><b>Download for Windows</b></a>
+  <a href="https://github.com/hollisorg/iv-outreach/releases/latest"><b>Download for Windows or Mac</b></a>
   &nbsp;·&nbsp;
   <a href="https://github.com/hollisorg/iv-hivemind-releases/releases/latest/download/IV-Hivemind-Setup.exe"><b>IV Hivemind</b></a>
   &nbsp;·&nbsp;
@@ -78,7 +78,7 @@ verified deliverability or buying intent.
 
 ## What you need
 
-- **Windows 10 or 11**, 64-bit.
+- **Windows 10 or 11**, 64-bit, or **macOS 12 or newer** on Apple Silicon or Intel (IV Hivemind is Windows only for now).
 - **Your own agent for the chat and research:** [Claude Code](https://claude.com/claude-code),
   [Codex](https://openai.com/codex) or Hermes, signed in on your own plan. Free discovery doesn't need a paid
   data-provider account.
@@ -92,11 +92,16 @@ verified deliverability or buying intent.
    Choose **More info → Run anyway**.
 3. Open IV Outreach and follow the guided setup: your business, your agent and, if you like, your mailbox.
 
+**On a Mac:** download `IV-Outreach-mac-arm64.dmg` (Apple Silicon) or `IV-Outreach-mac-x64.dmg` (Intel) from the same page,
+open it and drag IV Outreach into Applications. It isn't signed with an Apple Developer ID yet, so the first time
+macOS won't open it: go to **System Settings → Privacy & Security** and click **Open Anyway**. Open it from
+Applications (not the disk image) so it can update itself.
+
 IV Outreach updates itself from this repository's releases, with no account or sign-in needed. It checks
 when it opens and every six hours, downloads new versions in the background, and installs them when you
 close it. **Settings → App updates** shows your version, with Check for updates and Restart and install,
 and lets you turn automatic updates off. Your data is kept in `%APPDATA%\Fitscout` (IV Outreach's working
-name).
+name; `~/Library/Application Support/Fitscout` on a Mac).
 
 ## IV Hivemind
 
