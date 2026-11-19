@@ -49,3 +49,6 @@ export const STATUS = {
 
 // Anywhere in the app can hand the chat a question (ChatPanel listens).
 export const askAgent = ({ text = '', send = false } = {}) => window.dispatchEvent(new CustomEvent('fs:ask', { detail: { text, send } }))
+
+// The IV Newsletter box's door into the main process (src/main/newsletter.js)
+export const newsletterApi = { status: () => call('newsletterStatus'), join: (input) => call('newsletterJoin', input), closeCard: () => call('newsletterCloseCard'), openPage: () => call('newsletterOpenPage') }

@@ -1,3 +1,4 @@
+import { createNewsletter, fileStore, NEWSLETTER_PAGE } from './newsletter.js'
 import { workspaceHost } from '../service/iv-workspace-host.js'
 import { app, BrowserWindow, ipcMain, shell, clipboard, dialog, safeStorage, nativeImage } from 'electron'
 import { randomUUID } from 'node:crypto'
@@ -329,7 +330,21 @@ const ivWorkspace = workspaceHost({ appId: 'outreach', dataDir: fs.defaultDataDi
 })
 app.on('open-url', (event, url) => { event.preventDefault(); ivWorkspace.capture([url]) })
 
+// The IV Newsletter (src/main/newsletter.js, shared by every IV app): sends only an address typed and joined, keeps
+// only the join date. A copy with its own data folder (FITSCOUT_DATA_DIR) is a test copy: it only sends to IV_NEWSLETTER_URL.
+let newsletterInst = null
+const newsletter = () => newsletterInst || (newsletterInst = createNewsletter({
+  app: 'iv-outreach',
+  version: app.getVersion(),
+  store: fileStore(join(app.getPath('userData'), 'newsletter.json')),
+  url: process.env.FITSCOUT_DATA_DIR ? process.env.IV_NEWSLETTER_URL || 'http://127.0.0.1:9/iv-newsletter' : undefined,
+}))
+
 const METHODS = {
+  newsletterStatus: () => newsletter().status(),
+  newsletterJoin: (input) => newsletter().join(input),
+  newsletterCloseCard: () => newsletter().closeCard(),
+  newsletterOpenPage: () => shell.openExternal(NEWSLETTER_PAGE),
   ivWorkspace: ({method,args}) => { if (!Object.hasOwn(ivWorkspace.api, method)) throw Error('Unknown workspace action.'); return ivWorkspace.api[method](args || {}) },
   updatesStatus,
   updatesCheck: async () => { await appUpdates.check(); return updatesStatus() },

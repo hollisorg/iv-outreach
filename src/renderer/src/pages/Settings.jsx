@@ -1,11 +1,12 @@
 import PageStage from '../components/PageStage'
 import BusinessSettings from '../components/BusinessSettings'
 import { useEffect, useState } from 'react'
-import { call, useData } from '../api'
+import { call, newsletterApi, useData } from '../api'
 import { AgentRows, useAgentSetup } from '../components/AgentSetup'
 import ResearchSettings from '../components/ResearchSettings'
 import PremiumSettings from '../components/PremiumSettings'
 import AppUpdates from '../components/AppUpdates'
+import NewsletterBox from '../components/NewsletterBox'
 import MailboxConnect from '../components/MailboxConnect'
 
 const FIELDS = [
@@ -19,6 +20,7 @@ const FIELDS = [
 
 const TOPICS = [
   ['updates', 'App updates', 'New versions, ready when you are.'],
+  ['newsletter', 'The IV Newsletter', 'Optional. Nothing is sent unless you join here.'],
   ['businesses', 'Businesses', 'Brands, audiences and campaigns.'],
   ['agent', 'Your agent', 'Your personal agent connection, shared across businesses.'],
   ['research', 'Research', 'Choose how you discover and understand opportunities.'],
@@ -44,6 +46,7 @@ export default function Settings({ notify, openOnboarding, ...workspace }) {
   }, [])
   const sections = {
     updates: <AppUpdates notify={notify} />,
+    newsletter: <NewsletterBox api={newsletterApi} title={false} />,
     businesses: <BusinessSettings {...workspace} notify={notify} />,
     agent: <Agent notify={notify} />, research: <ResearchSettings />,
     premium: <PremiumSettings notify={notify} />, sender: <Sender notify={notify} />,
