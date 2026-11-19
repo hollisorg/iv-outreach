@@ -20,8 +20,8 @@ A free Infinite Variance desktop app for finding and researching real businesses
 chat with your own **Claude Code, Codex or Hermes**. IV Outreach keeps your campaigns, leads, research and
 drafts on your PC, and nothing is sent without your approval.
 
-This repository also holds **[IV Hivemind](#iv-hivemind)** (`apps/hivemind`), the desktop overlay that opens
-and connects the IV apps.
+**[IV Hivemind](#iv-hivemind)**, the desktop overlay that opens and connects the IV apps, has its own repository:
+[hollisorg/iv-hivemind](https://github.com/hollisorg/iv-hivemind).
 
 <p align="center">
   <img src=".github/images/leads.png" alt="IV Outreach's Leads page: five fictional demo plumbing businesses in Columbus with their status, fit score, reach and last touch" width="100%">
@@ -118,7 +118,8 @@ anything that needs your OK waits for you.
 
 [Download `IV-Hivemind-Setup.exe`](https://github.com/hollisorg/iv-hivemind-releases/releases/latest/download/IV-Hivemind-Setup.exe).
 Its installers and updates are published from [iv-hivemind-releases](https://github.com/hollisorg/iv-hivemind-releases);
-the source is here, in `apps/hivemind`. It updates itself; the gear button shows its version.
+the source is in [hollisorg/iv-hivemind](https://github.com/hollisorg/iv-hivemind) (until 2026-11-19 it lived
+here, in `apps/hivemind`). It updates itself; the gear button shows its version.
 
 ## Build it yourself
 
@@ -128,11 +129,10 @@ You need Node.js 24 on Windows.
 npm ci
 node node_modules/electron/install.js   # npm 11 skips Electron's install script
 npm test
-npm run dist            # IV Outreach installer in dist/
-npm run hivemind:dist   # IV Hivemind installer in apps/hivemind/dist/
+npm run dist   # IV Outreach installer in dist/
 ```
 
-`npm run dev` and `npm run hivemind:dev` run them from source. The Google Maps scraper used by local
+`npm run dev` runs it from source. The Google Maps scraper used by local
 searches isn't in git; `node scripts/restore-vendor.mjs` fetches the pinned release (see
 `vendor/README.md`). `node scripts/ui-check.mjs <folder>` opens the built app on a throwaway database of
 fictional demo data and screenshots each page; the screenshots here come from it.
