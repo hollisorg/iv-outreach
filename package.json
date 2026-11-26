@@ -12,9 +12,6 @@
   },
   "scripts": {
     "dev": "electron-vite dev",
-    "hivemind:dev": "electron-vite dev --config apps/hivemind/electron.vite.config.mjs --entry apps/hivemind",
-    "hivemind:build": "electron-vite build --config apps/hivemind/electron.vite.config.mjs",
-    "hivemind:dist": "npm run hivemind:build && electron-builder --projectDir apps/hivemind --win --x64 --publish never",
     "build": "electron-vite build",
     "start": "electron-vite preview",
     "test": "node --test --test-concurrency=1 \"test/*.test.mjs\"",
