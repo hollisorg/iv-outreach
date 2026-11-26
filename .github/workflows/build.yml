@@ -30,20 +30,51 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+
+  windows:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 25
+    environment: windows-signing
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: package-lock.json
       - name: Verify release version
-        if: startsWith(github.ref, 'refs/tags/v')
         shell: pwsh
         run: |
           $version = (Get-Content package.json | ConvertFrom-Json).version
           if ($env:GITHUB_REF_NAME -ne "v$version") { throw 'Tag and package version must match.' }
+      - run: npm ci
       - name: Restore pinned Maps scraper
-        if: startsWith(github.ref, 'refs/tags/v')
         run: npm run vendor:restore
-      - name: Build Windows release
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: npm run dist
+
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Sign in to Azure using GitHub OIDC
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3
+        env:
+          AZURE_CORE_OUTPUT: none
+        with:
+          client-id: ${{ vars.IV_SIGNING_AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.IV_SIGNING_AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+
+      - name: Build and verify signed Windows release
+        run: npm run dist:win-release
+
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: startsWith(github.ref, 'refs/tags/v')
         with:
           name: windows-release
           path: |
@@ -55,7 +86,7 @@ jobs:
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    needs: windows
     runs-on: windows-latest
     timeout-minutes: 10
     permissions:

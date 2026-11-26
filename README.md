@@ -142,3 +142,10 @@ fictional demo data and screenshots each page; the screenshots here come from it
 MIT (see [LICENSE](LICENSE)). Bundled third-party tools and data keep their own licences, listed in
 `vendor/README.md`. The Infinite Variance artwork is Infinite Variance's own and isn't covered by the MIT
 licence. The businesses in the screenshots are fictional and marked "(demo)".
+
+## Signed Windows release builds
+
+Run `npm run dist:win-release` on Windows to stage a signed installer, blockmap, and updater
+manifest in `dist/`. Use the Hollis Azure tenant in Azure CLI, with the .NET 10 x64 runtime
+and Windows SDK 22621 or newer installed. The release build checks the publisher, timestamp,
+and updater checksum before it succeeds. `npm run dist` is for unsigned development builds.
